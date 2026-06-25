@@ -1,0 +1,83 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 220 33% 98%;
+    --foreground: 225 47% 20%;
+    --card: 0 0% 100%;
+    --card-foreground: 225 47% 20%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 225 47% 20%;
+    --primary: 225 47% 31%;
+    --primary-foreground: 220 33% 98%;
+    --secondary: 220 20% 90%;
+    --secondary-foreground: 225 47% 31%;
+    --muted: 220 15% 94%;
+    --muted-foreground: 225 15% 45%;
+    --accent: 196 75% 45%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 225 47% 31%;
+    --radius: 0.75rem;
+  }
+  .dark {
+    --background: 225 47% 10%;
+    --foreground: 220 33% 98%;
+    --card: 225 47% 12%;
+    --card-foreground: 220 33% 98%;
+    --popover: 225 47% 12%;
+    --popover-foreground: 220 33% 98%;
+    --primary: 220 33% 98%;
+    --primary-foreground: 225 47% 31%;
+    --secondary: 225 47% 20%;
+    --secondary-foreground: 220 33% 98%;
+    --muted: 225 47% 18%;
+    --muted-foreground: 220 15% 70%;
+    --accent: 196 75% 45%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 225 47% 18%;
+    --input: 225 47% 18%;
+    --ring: 220 33% 98%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+.pulsing-avatar {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.05);
+  }
+}
+
+.fade-tab-enter {
+  opacity: 0;
+  transform: translateY(10px);
+}
+.fade-tab-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 300ms, transform 300ms;
+}
