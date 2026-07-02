@@ -1,80 +1,220 @@
-
 "use client"
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { onSnapshot, doc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { useAuth } from "@/contexts/AuthContext";
 import { BottomNav, TabType } from "@/components/messaging/BottomNav";
-import { CHATS, CALLS, DISCOVER } from "./lib/mock-data";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Search, UserPlus, Check, X, Phone, Video, MessageSquare, Shield, Bell, Lock, Palette, TextQuote, Smartphone, Eye, Sparkles, UserCheck, ChevronLeft, LogOut, Plus } from "lucide-react";
+import {
+  Search, Phone, Video, Shield, Bell, Lock, Palette, TextQuote,
+  Smartphone, Eye, ChevronLeft, LogOut, Plus, PhoneMissed, PhoneIncoming, PhoneOutgoing, Loader2,
+} from "lucide-react";
 import { ChatView } from "@/components/messaging/ChatView";
 import { CallOverlay } from "@/components/messaging/CallOverlay";
-import { AIChatView } from "@/components/messaging/AIChatView";
 import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import {
+  subscribeChats,
+  subscribeDirectory,
+  markChatRead,
+  type ChatSummary,
+  type DirectoryUser,
+} from "@/lib/chat";
+import { subscribeCallHistory, type CallDoc } from "@/lib/webrtc";
+import { useCallManager } from "@/hooks/use-call-manager";
+import { useMessageNotifications } from "@/hooks/use-message-notifications";
+import { updateProfile } from "firebase/auth";
+import { doc as fsDoc, updateDoc } from "firebase/firestore";
+import { auth } from "@/lib/firebase";
 
 type SettingsView = 'main' | 'security' | 'theme' | 'language' | 'privacy';
 
+function timeAgo(ts: any) {
+  const ms = ts?.toMillis?.();
+  if (!ms) return '';
+  const diff = Date.now() - ms;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'now';
+  if (mins < 60) return `${mins}m`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h`;
+  const days = Math.floor(hrs / 24);
+  if (days < 2) return 'Yesterday';
+  return `${days}d`;
+}
+
 export default function MessengerApp() {
+  const router = useRouter();
+  const { user, profile, loading, logout } = useAuth();
+
   const [activeTab, setActiveTab] = useState<TabType>('chats');
-  const [selectedChat, setSelectedChat] = useState<typeof CHATS[0] | null>(null);
-  const [callState, setCallState] = useState<{ active: boolean; type: 'voice' | 'video'; contact: any; incoming: boolean } | null>(null);
-  const [showAIChat, setShowAIChat] = useState(false);
-  
-  // Settings sub-navigation
+  const [chats, setChats] = useState<ChatSummary[]>([]);
+  const [directory, setDirectory] = useState<DirectoryUser[]>([]);
+  const [callHistory, setCallHistory] = useState<Array<CallDoc & { id: string }>>([]);
+  const [blockedUsers, setBlockedUsers] = useState<string[]>([]);
+  const [selectedOtherUid, setSelectedOtherUid] = useState<string | null>(null);
+
   const [settingsView, setSettingsView] = useState<SettingsView>('main');
   const [isProfileEditing, setIsProfileEditing] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editStatus, setEditStatus] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
 
-  // Interactive state for Discover tab
-  const [friendRequests, setFriendRequests] = useState(DISCOVER.requests);
-  const [suggestions, setSuggestions] = useState(DISCOVER.suggestions);
-  const [followedIds, setFollowedIds] = useState<string[]>([]);
+  const callManager = useCallManager();
 
-  const handleAcceptRequest = (id: string) => {
-    setFriendRequests(prev => prev.filter(req => req.id !== id));
-  };
+  // Redirect unauthenticated visitors to the login page.
+  useEffect(() => {
+    if (!loading && !user) router.replace('/login');
+  }, [loading, user, router]);
 
-  const handleDeclineRequest = (id: string) => {
-    setFriendRequests(prev => prev.filter(req => req.id !== id));
-  };
+  useEffect(() => {
+    if (!user) return;
+    const unsub1 = subscribeChats(user.uid, setChats);
+    const unsub2 = subscribeDirectory(user.uid, setDirectory);
+    const unsub3 = subscribeCallHistory(user.uid, setCallHistory);
+    const unsub4 = onSnapshot(doc(db, "users", user.uid), (snap) => {
+      setBlockedUsers((snap.data() as any)?.blockedUsers || []);
+    });
+    return () => {
+      unsub1();
+      unsub2();
+      unsub3();
+      unsub4();
+    };
+  }, [user]);
 
-  const handleFollowSuggestion = (id: string) => {
-    if (followedIds.includes(id)) {
-      setFollowedIds(prev => prev.filter(fid => fid !== id));
-    } else {
-      setFollowedIds(prev => [...prev, id]);
+  const directoryMap = useMemo(() => {
+    const map: Record<string, DirectoryUser> = {};
+    directory.forEach((d) => (map[d.uid] = d));
+    return map;
+  }, [directory]);
+
+  const directoryMapLite = useMemo(() => {
+    const map: Record<string, { name: string; photoURL: string }> = {};
+    directory.forEach((d) => (map[d.uid] = { name: d.name, photoURL: d.photoURL }));
+    return map;
+  }, [directory]);
+
+  // Resolve each Firestore chat into a display-friendly row (other participant's info).
+  const chatRows = useMemo(() => {
+    if (!user) return [];
+    return chats
+      .map((chat) => {
+        const otherUid = chat.participants.find((p) => p !== user.uid);
+        const other = otherUid ? directoryMap[otherUid] : undefined;
+        if (!otherUid || !other) return null;
+        return {
+          chatId: chat.id,
+          otherUid,
+          name: other.name,
+          avatar: other.photoURL,
+          online: !!other.online,
+          lastMessage: chat.lastMessage,
+          time: timeAgo(chat.lastMessageAt),
+          unread: chat.unread?.[user.uid] || 0,
+        };
+      })
+      .filter(Boolean) as Array<{
+        chatId: string; otherUid: string; name: string; avatar: string;
+        online: boolean; lastMessage: string; time: string; unread: number;
+      }>;
+  }, [chats, directoryMap, user]);
+
+  const totalUnread = chatRows.reduce((acc, c) => acc + c.unread, 0);
+
+  const activeChatId = useMemo(() => {
+    if (!selectedOtherUid || !user) return null;
+    return [user.uid, selectedOtherUid].sort().join('_');
+  }, [selectedOtherUid, user]);
+
+  useMessageNotifications(
+    user?.uid,
+    chats,
+    directoryMapLite,
+    activeChatId,
+    (chatId) => {
+      const chat = chats.find((c) => c.id === chatId);
+      const otherUid = chat?.participants.find((p) => p !== user?.uid);
+      if (otherUid) setSelectedOtherUid(otherUid);
     }
+  );
+
+  const filteredDirectory = directory.filter((d) =>
+    d.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const selectedPerson = selectedOtherUid ? directoryMap[selectedOtherUid] : null;
+
+  const handleSaveProfile = async () => {
+    if (!auth.currentUser) return;
+    await updateProfile(auth.currentUser, { displayName: editName });
+    await updateDoc(fsDoc(db, "users", auth.currentUser.uid), {
+      name: editName,
+      status: editStatus,
+    });
+    setIsProfileEditing(false);
   };
 
-  const totalUnread = CHATS.reduce((acc, chat) => acc + chat.unread, 0);
-
-  if (showAIChat) {
-    return <AIChatView onBack={() => setShowAIChat(false)} />;
+  if (loading || !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-6 w-6 animate-spin text-accent" />
+      </div>
+    );
   }
 
-  if (selectedChat) {
+  // Incoming call ringing (takes priority over an in-progress call view).
+  if (callManager.incomingCall && !callManager.activeCall) {
     return (
-      <ChatView 
-        chat={selectedChat} 
-        onBack={() => setSelectedChat(null)} 
-        onCall={(type) => setCallState({ active: true, type, contact: selectedChat, incoming: false })}
-        onAIChat={() => setShowAIChat(true)}
+      <CallOverlay
+        name={callManager.incomingCall.callerName}
+        avatar={callManager.incomingCall.callerAvatar}
+        type={callManager.incomingCall.type}
+        incoming
+        onEnd={callManager.declineIncomingCall}
+        onAccept={callManager.acceptCall}
       />
     );
   }
 
-  if (callState?.active) {
+  if (callManager.activeCall) {
+    const c = callManager.activeCall;
     return (
-      <CallOverlay 
-        name={callState.contact.name} 
-        avatar={callState.contact.avatar} 
-        type={callState.type} 
-        incoming={callState.incoming}
-        onEnd={() => setCallState(null)}
-        onAccept={() => setCallState({ ...callState, incoming: false })}
+      <CallOverlay
+        name={c.name}
+        avatar={c.avatar}
+        type={c.type}
+        status={c.status}
+        localStream={c.localStream}
+        remoteStream={c.remoteStream}
+        onEnd={callManager.hangUp}
+        onToggleMute={callManager.toggleMute}
+        onToggleVideo={callManager.toggleVideo}
+      />
+    );
+  }
+
+  if (selectedPerson) {
+    return (
+      <ChatView
+        chat={{
+          id: selectedPerson.uid,
+          name: selectedPerson.name,
+          avatar: selectedPerson.photoURL,
+          online: !!selectedPerson.online,
+        }}
+        isBlocked={blockedUsers.includes(selectedPerson.uid)}
+        onBack={() => setSelectedOtherUid(null)}
+        onCall={(type) => callManager.startCall(
+          { id: selectedPerson.uid, name: selectedPerson.name, avatar: selectedPerson.photoURL },
+          type
+        )}
       />
     );
   }
@@ -91,18 +231,13 @@ export default function MessengerApp() {
               </Button>
             )}
             <h1 className="text-2xl font-bold font-headline capitalize">
-              {activeTab === 'settings' && settingsView !== 'main' ? settingsView.replace(/^\w/, c => c.toUpperCase()) : activeTab}
+              {activeTab === 'settings' && settingsView !== 'main' ? settingsView.replace(/^\w/, c => c.toUpperCase()) : activeTab === 'discover' ? 'People' : activeTab}
             </h1>
           </div>
           <div className="flex gap-2">
             <Button variant="ghost" size="icon" className="rounded-full bg-muted/50">
               <Search className="h-5 w-5" />
             </Button>
-            {activeTab === 'chats' && (
-              <Button variant="ghost" size="icon" onClick={() => setShowAIChat(true)} className="rounded-full bg-accent/10 text-accent">
-                <Sparkles className="h-5 w-5" />
-              </Button>
-            )}
           </div>
         </div>
       </header>
@@ -111,10 +246,18 @@ export default function MessengerApp() {
       <main className="flex-1 px-5 overflow-y-auto animate-in fade-in slide-in-from-bottom-2 duration-300">
         {activeTab === 'chats' && (
           <div className="space-y-1">
-            {CHATS.map((chat) => (
+            {chatRows.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center mt-10">
+                No conversations yet. Head to the People tab to say hello.
+              </p>
+            )}
+            {chatRows.map((chat) => (
               <button
-                key={chat.id}
-                onClick={() => setSelectedChat(chat)}
+                key={chat.chatId}
+                onClick={async () => {
+                  setSelectedOtherUid(chat.otherUid);
+                  await markChatRead(chat.chatId, user.uid);
+                }}
                 className="w-full flex items-center gap-4 py-3 border-b border-border/50 last:border-0 hover:bg-muted/30 transition-colors rounded-lg px-2"
               >
                 <div className="relative">
@@ -130,7 +273,7 @@ export default function MessengerApp() {
                     <span className="text-[11px] text-muted-foreground">{chat.time}</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <p className="text-sm text-muted-foreground truncate max-w-[180px]">{chat.lastMessage}</p>
+                    <p className="text-sm text-muted-foreground truncate max-w-[180px]">{chat.lastMessage || 'Say hello 👋'}</p>
                     {chat.unread > 0 && (
                       <Badge className="bg-accent h-5 min-w-5 flex items-center justify-center p-0 rounded-full text-[10px]">{chat.unread}</Badge>
                     )}
@@ -144,63 +287,45 @@ export default function MessengerApp() {
         {activeTab === 'discover' && (
           <div className="space-y-8">
             <div className="relative">
-               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-               <Input placeholder="Find people..." className="pl-10 rounded-full bg-muted/50 border-none h-11" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Find people..."
+                className="pl-10 rounded-full bg-muted/50 border-none h-11"
+              />
             </div>
 
-            {friendRequests.length > 0 && (
-              <div>
-                <h3 className="text-sm font-bold text-primary mb-4 uppercase tracking-wider">Friend Requests</h3>
-                {friendRequests.map((req) => (
-                  <div key={req.id} className="flex items-center gap-4 mb-4 bg-muted/20 p-3 rounded-xl transition-all">
-                    <Avatar className="h-12 w-12">
-                      <AvatarImage src={req.avatar} />
-                      <AvatarFallback>{req.name[0]}</AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1">
-                      <h4 className="font-semibold text-sm">{req.name}</h4>
-                      <p className="text-[11px] text-muted-foreground">{req.mutualFriends} mutual friends</p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button onClick={() => handleAcceptRequest(req.id)} size="icon" className="h-9 w-9 rounded-full bg-accent">
-                        <Check className="h-4 w-4" />
-                      </Button>
-                      <Button onClick={() => handleDeclineRequest(req.id)} size="icon" variant="ghost" className="h-9 w-9 rounded-full bg-muted">
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
             <div>
-              <h3 className="text-sm font-bold text-primary mb-4 uppercase tracking-wider">Suggested for you</h3>
+              <h3 className="text-sm font-bold text-primary mb-4 uppercase tracking-wider">
+                People on My Messenger
+              </h3>
               <div className="grid grid-cols-1 gap-4">
-                {suggestions.map((person) => (
-                  <div key={person.id} className="flex items-center justify-between group">
+                {filteredDirectory.length === 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    No one else has signed up yet — invite a friend!
+                  </p>
+                )}
+                {filteredDirectory.map((person) => (
+                  <button
+                    key={person.uid}
+                    onClick={() => setSelectedOtherUid(person.uid)}
+                    className="flex items-center justify-between group"
+                  >
                     <div className="flex items-center gap-3">
                       <div className="relative">
                         <Avatar className="h-12 w-12">
-                          <AvatarImage src={person.avatar} />
+                          <AvatarImage src={person.photoURL} />
                           <AvatarFallback>{person.name[0]}</AvatarFallback>
                         </Avatar>
                         {person.online && <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-background rounded-full" />}
                       </div>
-                      <div>
+                      <div className="text-left">
                         <h4 className="text-sm font-semibold">{person.name}</h4>
-                        <p className="text-xs text-muted-foreground">{person.role}</p>
+                        <p className="text-xs text-muted-foreground">{person.status || (person.online ? 'Online' : 'Offline')}</p>
                       </div>
                     </div>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      onClick={() => handleFollowSuggestion(person.id)}
-                      className={cn("rounded-full transition-colors", followedIds.includes(person.id) ? "text-green-600 bg-green-50" : "text-accent hover:bg-accent/10")}
-                    >
-                      {followedIds.includes(person.id) ? <UserCheck className="h-5 w-5" /> : <UserPlus className="h-5 w-5" />}
-                    </Button>
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>
@@ -209,30 +334,47 @@ export default function MessengerApp() {
 
         {activeTab === 'calls' && (
           <div className="space-y-1">
-            {CALLS.map((call) => (
-              <div key={call.id} className="flex items-center gap-4 py-3 group">
-                <Avatar className="h-12 w-12">
-                  <AvatarImage src={call.avatar} />
-                  <AvatarFallback>{call.name[0]}</AvatarFallback>
-                </Avatar>
-                <div className="flex-1">
-                  <h4 className={cn("font-semibold text-sm", call.status === 'missed' && "text-destructive")}>
-                    {call.name}
-                  </h4>
-                  <div className="flex items-center gap-1.5">
-                    {call.type === 'voice' ? <Phone className="h-3 w-3 text-muted-foreground" /> : <Video className="h-3 w-3 text-muted-foreground" />}
-                    <span className="text-[11px] text-muted-foreground">{call.time}</span>
-                    <span className="text-[11px] text-muted-foreground opacity-50">•</span>
-                    <span className={cn("text-[11px] font-medium", call.status === 'completed' ? "text-accent" : "text-destructive")}>
-                      {call.status === 'completed' ? call.duration : 'Missed'}
-                    </span>
+            {callHistory.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center mt-10">No calls yet.</p>
+            )}
+            {callHistory.map((call) => {
+              const isOutgoing = call.callerId === user.uid;
+              const other = isOutgoing
+                ? { name: call.calleeName, avatar: call.calleeAvatar }
+                : { name: call.callerName, avatar: call.callerAvatar };
+              const missed = call.status === 'declined' || call.status === 'missed';
+              return (
+                <div key={call.id} className="flex items-center gap-4 py-3 group">
+                  <Avatar className="h-12 w-12">
+                    <AvatarImage src={other.avatar} />
+                    <AvatarFallback>{other.name?.[0]}</AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1">
+                    <h4 className={cn("font-semibold text-sm", missed && "text-destructive")}>
+                      {other.name}
+                    </h4>
+                    <div className="flex items-center gap-1.5">
+                      {isOutgoing ? (
+                        <PhoneOutgoing className="h-3 w-3 text-muted-foreground" />
+                      ) : missed ? (
+                        <PhoneMissed className="h-3 w-3 text-destructive" />
+                      ) : (
+                        <PhoneIncoming className="h-3 w-3 text-muted-foreground" />
+                      )}
+                      <span className="text-[11px] text-muted-foreground capitalize">{call.type} call</span>
+                    </div>
                   </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => callManager.startCall({ id: isOutgoing ? call.calleeId : call.callerId, name: other.name, avatar: other.avatar }, call.type)}
+                    className="rounded-full text-primary hover:bg-primary/5"
+                  >
+                    {call.type === 'voice' ? <Phone className="h-5 w-5" /> : <Video className="h-5 w-5" />}
+                  </Button>
                 </div>
-                <Button variant="ghost" size="icon" className="rounded-full text-primary hover:bg-primary/5">
-                  {call.type === 'voice' ? <Phone className="h-5 w-5" /> : <Video className="h-5 w-5" />}
-                </Button>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
@@ -242,90 +384,93 @@ export default function MessengerApp() {
               <>
                 <div className="bg-primary/5 p-6 rounded-3xl flex flex-col items-center text-center">
                   <Avatar className="h-24 w-24 mb-4 ring-4 ring-background shadow-xl">
-                    <AvatarImage src="https://picsum.photos/seed/user/200/200" />
-                    <AvatarFallback>JD</AvatarFallback>
+                    <AvatarImage src={profile?.photoURL} />
+                    <AvatarFallback>{profile?.name?.[0]}</AvatarFallback>
                   </Avatar>
-                  <h3 className="text-xl font-bold font-headline">John Doe</h3>
-                  <p className="text-sm text-muted-foreground">Product Designer</p>
-                  <Button variant="outline" onClick={() => setIsProfileEditing(true)} className="mt-4 rounded-full px-6 text-xs h-8">Edit Profile</Button>
+                  <h3 className="text-xl font-bold font-headline">{profile?.name}</h3>
+                  <p className="text-sm text-muted-foreground">{profile?.email}</p>
+                  <Button
+                    variant="outline"
+                    onClick={() => { setEditName(profile?.name || ''); setEditStatus(profile?.status || ''); setIsProfileEditing(true); }}
+                    className="mt-4 rounded-full px-6 text-xs h-8"
+                  >
+                    Edit Profile
+                  </Button>
                 </div>
 
                 <div className="space-y-4">
-                   <section>
-                     <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-3 ml-2">Notifications</h4>
-                     <div className="bg-card rounded-2xl border overflow-hidden">
-                       <div className="flex items-center justify-between p-4 border-b last:border-0">
-                         <div className="flex items-center gap-3">
-                           <div className="bg-blue-100 p-2 rounded-lg"><MessageSquare className="h-4 w-4 text-blue-600" /></div>
-                           <span className="text-sm font-medium">Messages</span>
-                         </div>
-                         <Switch defaultChecked />
-                       </div>
-                       <div className="flex items-center justify-between p-4 border-b last:border-0">
-                         <div className="flex items-center gap-3">
-                           <div className="bg-green-100 p-2 rounded-lg"><Phone className="h-4 w-4 text-green-600" /></div>
-                           <span className="text-sm font-medium">Calls</span>
-                         </div>
-                         <Switch defaultChecked />
-                       </div>
-                       <div className="flex items-center justify-between p-4">
-                         <div className="flex items-center gap-3">
-                           <div className="bg-purple-100 p-2 rounded-lg"><UserPlus className="h-4 w-4 text-purple-600" /></div>
-                           <span className="text-sm font-medium">Friend Requests</span>
-                         </div>
-                         <Switch />
-                       </div>
-                     </div>
-                   </section>
+                  <section>
+                    <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-3 ml-2">Notifications</h4>
+                    <div className="bg-card rounded-2xl border overflow-hidden">
+                      <div className="flex items-center justify-between p-4 border-b last:border-0">
+                        <div className="flex items-center gap-3">
+                          <div className="bg-blue-100 p-2 rounded-lg"><Bell className="h-4 w-4 text-blue-600" /></div>
+                          <span className="text-sm font-medium">Message Notifications</span>
+                        </div>
+                        <Switch defaultChecked />
+                      </div>
+                      <div className="flex items-center justify-between p-4">
+                        <div className="flex items-center gap-3">
+                          <div className="bg-green-100 p-2 rounded-lg"><Phone className="h-4 w-4 text-green-600" /></div>
+                          <span className="text-sm font-medium">Calls</span>
+                        </div>
+                        <Switch defaultChecked />
+                      </div>
+                    </div>
+                  </section>
 
-                   <section>
-                     <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-3 ml-2">Privacy</h4>
-                     <div className="bg-card rounded-2xl border overflow-hidden">
-                       <div className="flex items-center justify-between p-4 border-b last:border-0">
-                         <div className="flex items-center gap-3">
-                           <div className="bg-orange-100 p-2 rounded-lg"><Eye className="h-4 w-4 text-orange-600" /></div>
-                           <span className="text-sm font-medium">Read Receipts</span>
-                         </div>
-                         <Switch defaultChecked />
-                       </div>
-                       <div className="flex items-center justify-between p-4 border-b last:border-0">
-                         <div className="flex items-center gap-3">
-                           <div className="bg-cyan-100 p-2 rounded-lg"><Smartphone className="h-4 w-4 text-cyan-600" /></div>
-                           <span className="text-sm font-medium">Typing Indicator</span>
-                         </div>
-                         <Switch defaultChecked />
-                       </div>
-                     </div>
-                   </section>
+                  <section>
+                    <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-3 ml-2">Privacy</h4>
+                    <div className="bg-card rounded-2xl border overflow-hidden">
+                      <div className="flex items-center justify-between p-4 border-b last:border-0">
+                        <div className="flex items-center gap-3">
+                          <div className="bg-orange-100 p-2 rounded-lg"><Eye className="h-4 w-4 text-orange-600" /></div>
+                          <span className="text-sm font-medium">Read Receipts</span>
+                        </div>
+                        <Switch defaultChecked />
+                      </div>
+                      <div className="flex items-center justify-between p-4">
+                        <div className="flex items-center gap-3">
+                          <div className="bg-cyan-100 p-2 rounded-lg"><Smartphone className="h-4 w-4 text-cyan-600" /></div>
+                          <span className="text-sm font-medium">Typing Indicator</span>
+                        </div>
+                        <Switch defaultChecked />
+                      </div>
+                    </div>
+                  </section>
 
-                   <section>
-                     <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-3 ml-2">General</h4>
-                     <div className="bg-card rounded-2xl border overflow-hidden">
-                       {[
-                         { id: 'security' as const, icon: Shield, label: 'Account Security', color: 'slate' },
-                         { id: 'theme' as const, icon: Palette, label: 'Theme & Appearance', color: 'pink' },
-                         { id: 'language' as const, icon: TextQuote, label: 'Language', color: 'indigo' },
-                         { id: 'privacy' as const, icon: Lock, label: 'Privacy Policy', color: 'slate' }
-                       ].map((item, i) => (
-                         <button 
-                           key={i} 
-                           onClick={() => setSettingsView(item.id)}
-                           className="w-full flex items-center justify-between p-4 border-b last:border-0 hover:bg-muted/30"
-                         >
-                           <div className="flex items-center gap-3">
-                             <div className="bg-muted p-2 rounded-lg"><item.icon className="h-4 w-4 text-muted-foreground" /></div>
-                             <span className="text-sm font-medium">{item.label}</span>
-                           </div>
-                           <Badge variant="ghost" className="text-[10px] opacity-50">View</Badge>
-                         </button>
-                       ))}
-                     </div>
-                   </section>
-                   
-                   <Button variant="ghost" className="w-full text-destructive hover:text-destructive hover:bg-destructive/10 rounded-2xl h-12">
-                     <LogOut className="h-4 w-4 mr-2" />
-                     Log Out
-                   </Button>
+                  <section>
+                    <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-3 ml-2">General</h4>
+                    <div className="bg-card rounded-2xl border overflow-hidden">
+                      {[
+                        { id: 'security' as const, icon: Shield, label: 'Account Security' },
+                        { id: 'theme' as const, icon: Palette, label: 'Theme & Appearance' },
+                        { id: 'language' as const, icon: TextQuote, label: 'Language' },
+                        { id: 'privacy' as const, icon: Lock, label: 'Privacy Policy' },
+                      ].map((item, i) => (
+                        <button
+                          key={i}
+                          onClick={() => setSettingsView(item.id)}
+                          className="w-full flex items-center justify-between p-4 border-b last:border-0 hover:bg-muted/30"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="bg-muted p-2 rounded-lg"><item.icon className="h-4 w-4 text-muted-foreground" /></div>
+                            <span className="text-sm font-medium">{item.label}</span>
+                          </div>
+                          <Badge variant="secondary" className="text-[10px] opacity-50">View</Badge>
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+
+                  <Button
+                    variant="ghost"
+                    onClick={() => logout()}
+                    className="w-full text-destructive hover:text-destructive hover:bg-destructive/10 rounded-2xl h-12"
+                  >
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Log Out
+                  </Button>
                 </div>
               </>
             ) : (
@@ -378,7 +523,6 @@ export default function MessengerApp() {
                     {['English (US)', 'Español', 'Français', 'Deutsch', '日本語', 'Português'].map((lang, i) => (
                       <button key={i} className="w-full flex items-center justify-between p-4 border-b last:border-0 hover:bg-muted/30">
                         <span className="text-sm font-medium">{lang}</span>
-                        {i === 0 && <Check className="h-4 w-4 text-accent" />}
                       </button>
                     ))}
                   </div>
@@ -387,8 +531,8 @@ export default function MessengerApp() {
                 {settingsView === 'privacy' && (
                   <div className="space-y-4">
                     <div className="prose prose-sm text-muted-foreground bg-card p-4 rounded-2xl border">
-                      <p>At My Messenger, we value your privacy. All your messages are end-to-end encrypted, meaning only you and the person you are communicating with can read them.</p>
-                      <p className="mt-2">We do not sell your data to third parties. Your personal information is used only to improve your experience within the app.</p>
+                      <p>At My Messenger, we value your privacy. Messages are stored securely in your Firebase project and only shared with the people you message.</p>
+                      <p className="mt-2">We do not sell your data to third parties.</p>
                     </div>
                     <Button variant="outline" className="w-full rounded-xl">Download My Data</Button>
                   </div>
@@ -410,28 +554,23 @@ export default function MessengerApp() {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="flex justify-center">
-               <div className="relative">
-                 <Avatar className="h-20 w-20">
-                   <AvatarImage src="https://picsum.photos/seed/user/200/200" />
-                   <AvatarFallback>JD</AvatarFallback>
-                 </Avatar>
-                 <Button size="icon" className="absolute bottom-0 right-0 h-6 w-6 rounded-full bg-accent">
-                   <Plus className="h-3 w-3" />
-                 </Button>
-               </div>
+              <Avatar className="h-20 w-20">
+                <AvatarImage src={profile?.photoURL} />
+                <AvatarFallback>{profile?.name?.[0]}</AvatarFallback>
+              </Avatar>
             </div>
             <div className="space-y-2">
               <label className="text-[10px] font-bold uppercase tracking-wider ml-1">Display Name</label>
-              <Input defaultValue="John Doe" className="rounded-xl bg-muted/50 border-none" />
+              <Input value={editName} onChange={(e) => setEditName(e.target.value)} className="rounded-xl bg-muted/50 border-none" />
             </div>
             <div className="space-y-2">
               <label className="text-[10px] font-bold uppercase tracking-wider ml-1">Status</label>
-              <Input defaultValue="Product Designer" className="rounded-xl bg-muted/50 border-none" />
+              <Input value={editStatus} onChange={(e) => setEditStatus(e.target.value)} className="rounded-xl bg-muted/50 border-none" />
             </div>
           </div>
           <DialogFooter className="flex-row gap-2">
             <Button variant="ghost" onClick={() => setIsProfileEditing(false)} className="flex-1 rounded-xl">Cancel</Button>
-            <Button onClick={() => setIsProfileEditing(false)} className="flex-1 rounded-xl bg-accent hover:bg-accent/90">Save Changes</Button>
+            <Button onClick={handleSaveProfile} className="flex-1 rounded-xl bg-accent hover:bg-accent/90">Save Changes</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

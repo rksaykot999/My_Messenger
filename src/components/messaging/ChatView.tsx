@@ -1,74 +1,91 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react";
-import { ArrowLeft, Phone, Video, Plus, Send, Image as ImageIcon, Camera, Film, MoreVertical, Sparkles } from "lucide-react";
+import { ArrowLeft, Phone, Video, Plus, Send, Image as ImageIcon, Camera, Film, Info, Trash2, ShieldOff, ShieldCheck, UserRound } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusIcon } from "./StatusIcon";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-
-interface Message {
-  id: string;
-  text: string;
-  sender: 'me' | 'other';
-  time: string;
-  status: 'sent' | 'delivered' | 'read';
-}
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  ensureChat,
+  subscribeMessages,
+  sendMessage,
+  markChatRead,
+  deleteChatHistory,
+  blockUser,
+  unblockUser,
+  type ChatMessage,
+} from "@/lib/chat";
+import { clearNotificationsForChat } from "@/lib/notifications";
+import { useToast } from "@/hooks/use-toast";
 
 interface ChatViewProps {
-  chat: { id: string; name: string; avatar: string; online: boolean };
+  chat: { id: string; name: string; avatar: string; online: boolean; status?: string };
   onBack: () => void;
   onCall: (type: 'voice' | 'video') => void;
-  onAIChat?: () => void;
+  isBlocked?: boolean;
 }
 
-export function ChatView({ chat, onBack, onCall, onAIChat }: ChatViewProps) {
-  const [messages, setMessages] = useState<Message[]>([
-    { id: '1', text: 'Hey Sarah, are you available for a quick sync?', sender: 'me', time: '10:40 AM', status: 'read' },
-    { id: '2', text: 'Sure! I just finished reviewing the proposal.', sender: 'other', time: '10:42 AM', status: 'read' },
-    { id: '3', text: 'The proposal looks great!', sender: 'other', time: '10:45 AM', status: 'read' },
-  ]);
+export function ChatView({ chat, onBack, onCall, isBlocked }: ChatViewProps) {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState("");
-  const [isTyping, setIsTyping] = useState(false);
+  const [chatId, setChatId] = useState<string | null>(null);
+  const [infoOpen, setInfoOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmBlock, setConfirmBlock] = useState(false);
+  const [blocked, setBlocked] = useState(!!isBlocked);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Set up (or create) the realtime chat and subscribe to its messages.
+  useEffect(() => {
+    if (!user) return;
+    let unsub: (() => void) | undefined;
+    (async () => {
+      const id = await ensureChat(user.uid, chat.id);
+      setChatId(id);
+      await markChatRead(id, user.uid);
+      clearNotificationsForChat(id);
+      unsub = subscribeMessages(id, setMessages);
+    })();
+    return () => unsub?.();
+  }, [user, chat.id]);
 
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages, isTyping]);
+  }, [messages]);
 
-  const handleSend = () => {
-    if (!inputText.trim()) return;
-    
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      text: inputText,
-      sender: 'me',
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      status: 'sent',
-    };
-    
-    setMessages(prev => [...prev, newMessage]);
+  const handleSend = async () => {
+    if (!inputText.trim() || !user || !chatId) return;
+    if (blocked) {
+      toast({ title: "You've blocked this user", description: "Unblock them to send a message." });
+      return;
+    }
+    const text = inputText;
     setInputText("");
-
-    // Simulate response & typing
-    setTimeout(() => {
-      setIsTyping(true);
-      setTimeout(() => {
-        setIsTyping(false);
-        const reply: Message = {
-          id: (Date.now() + 1).toString(),
-          text: "Thanks! Let me know what the client says.",
-          sender: 'other',
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          status: 'read',
-        };
-        setMessages(prev => [...prev, reply]);
-      }, 2500);
-    }, 1000);
+    await sendMessage(chatId, user.uid, text);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -76,6 +93,29 @@ export function ChatView({ chat, onBack, onCall, onAIChat }: ChatViewProps) {
       e.preventDefault();
       handleSend();
     }
+  };
+
+  const handleDeleteHistory = async () => {
+    if (!chatId) return;
+    await deleteChatHistory(chatId);
+    setConfirmDelete(false);
+    setInfoOpen(false);
+    toast({ title: "Chat history deleted" });
+  };
+
+  const handleToggleBlock = async () => {
+    if (!user) return;
+    if (blocked) {
+      await unblockUser(user.uid, chat.id);
+      setBlocked(false);
+      toast({ title: `${chat.name} unblocked` });
+    } else {
+      await blockUser(user.uid, chat.id);
+      setBlocked(true);
+      toast({ title: `${chat.name} blocked`, description: "They can no longer message you." });
+    }
+    setConfirmBlock(false);
+    setInfoOpen(false);
   };
 
   return (
@@ -97,7 +137,7 @@ export function ChatView({ chat, onBack, onCall, onAIChat }: ChatViewProps) {
             <div>
               <h3 className="text-sm font-semibold leading-none font-headline">{chat.name}</h3>
               <p className="text-[10px] text-muted-foreground mt-1">
-                {chat.online ? 'Online' : 'Last seen 2h ago'}
+                {blocked ? 'Blocked' : chat.online ? 'Online' : 'Last seen recently'}
               </p>
             </div>
           </div>
@@ -109,52 +149,48 @@ export function ChatView({ chat, onBack, onCall, onAIChat }: ChatViewProps) {
           <Button variant="ghost" size="icon" onClick={() => onCall('video')} className="text-primary">
             <Video className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon" onClick={onAIChat} className="text-accent">
-            <Sparkles className="h-4 w-4" />
+          <Button variant="ghost" size="icon" onClick={() => setInfoOpen(true)} className="text-primary">
+            <Info className="h-4 w-4" />
           </Button>
         </div>
       </header>
 
       {/* Messages */}
-      <div 
+      <div
         ref={scrollRef}
         className="flex-1 overflow-y-auto p-4 space-y-6 flex flex-col scroll-smooth pb-24"
       >
+        {messages.length === 0 && (
+          <p className="text-center text-xs text-muted-foreground mt-10">
+            Say hi to {chat.name.split(' ')[0]} 👋
+          </p>
+        )}
         {messages.map((msg) => (
           <div
             key={msg.id}
             className={cn(
               "flex flex-col max-w-[85%] animate-in fade-in slide-in-from-bottom-2 duration-300",
-              msg.sender === 'me' ? "ml-auto items-end" : "items-start"
+              msg.senderId === user?.uid ? "ml-auto items-end" : "items-start"
             )}
           >
             <div
               className={cn(
                 "px-4 py-2.5 rounded-2xl text-sm leading-relaxed shadow-sm",
-                msg.sender === 'me' 
-                  ? "bg-primary text-primary-foreground rounded-tr-none" 
+                msg.senderId === user?.uid
+                  ? "bg-primary text-primary-foreground rounded-tr-none"
                   : "bg-muted text-foreground rounded-tl-none"
               )}
             >
               {msg.text}
             </div>
             <div className="flex items-center gap-1.5 mt-1 px-1">
-              <span className="text-[10px] text-muted-foreground">{msg.time}</span>
-              {msg.sender === 'me' && <StatusIcon status={msg.status} />}
+              <span className="text-[10px] text-muted-foreground">
+                {msg.createdAt?.toDate ? msg.createdAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Sending…'}
+              </span>
+              {msg.senderId === user?.uid && <StatusIcon status={msg.status} />}
             </div>
           </div>
         ))}
-        {isTyping && (
-          <div className="flex items-start gap-2 animate-in fade-in slide-in-from-left-2 duration-300">
-            <div className="bg-muted px-4 py-2 rounded-2xl rounded-tl-none">
-              <div className="flex gap-1">
-                <span className="w-1.5 h-1.5 bg-muted-foreground/40 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                <span className="w-1.5 h-1.5 bg-muted-foreground/40 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                <span className="w-1.5 h-1.5 bg-muted-foreground/40 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Input Area */}
@@ -162,7 +198,7 @@ export function ChatView({ chat, onBack, onCall, onAIChat }: ChatViewProps) {
         <div className="max-w-md mx-auto flex items-end gap-2">
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="secondary" size="icon" className="shrink-0 h-10 w-10 rounded-full">
+              <Button variant="secondary" size="icon" className="shrink-0 h-10 w-10 rounded-full" disabled={blocked}>
                 <Plus className="h-5 w-5" />
               </Button>
             </PopoverTrigger>
@@ -189,23 +225,103 @@ export function ChatView({ chat, onBack, onCall, onAIChat }: ChatViewProps) {
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               onKeyDown={handleKeyPress}
-              placeholder="Message..."
+              placeholder={blocked ? "You've blocked this user" : "Message..."}
+              disabled={blocked}
               className="pr-10 py-3 rounded-3xl min-h-[44px] bg-muted/50 border-none focus-visible:ring-1 focus-visible:ring-accent"
             />
           </div>
 
-          <Button 
+          <Button
             onClick={handleSend}
-            disabled={!inputText.trim()}
+            disabled={!inputText.trim() || blocked}
             className={cn(
               "shrink-0 h-10 w-10 rounded-full p-0 transition-transform active:scale-95",
-              inputText.trim() ? "bg-accent hover:bg-accent/90" : "bg-muted text-muted-foreground"
+              inputText.trim() && !blocked ? "bg-accent hover:bg-accent/90" : "bg-muted text-muted-foreground"
             )}
           >
             <Send className="h-5 w-5 ml-0.5" />
           </Button>
         </div>
       </div>
+
+      {/* Info / options sheet (replaces old "Chat with AI" button) */}
+      <Sheet open={infoOpen} onOpenChange={setInfoOpen}>
+        <SheetContent side="bottom" className="rounded-t-3xl max-w-md mx-auto">
+          <SheetHeader className="mb-2">
+            <SheetTitle className="text-left">Conversation Options</SheetTitle>
+          </SheetHeader>
+          <div className="flex flex-col items-center text-center py-2 mb-2">
+            <Avatar className="h-16 w-16 mb-2">
+              <AvatarImage src={chat.avatar} />
+              <AvatarFallback>{chat.name[0]}</AvatarFallback>
+            </Avatar>
+            <h4 className="font-semibold">{chat.name}</h4>
+          </div>
+          <div className="space-y-1">
+            <button
+              onClick={() => { setInfoOpen(false); }}
+              className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-muted/50 text-left"
+            >
+              <div className="bg-muted p-2 rounded-lg"><UserRound className="h-4 w-4" /></div>
+              <span className="text-sm font-medium">View Contact Info</span>
+            </button>
+            <button
+              onClick={() => setConfirmDelete(true)}
+              className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-muted/50 text-left"
+            >
+              <div className="bg-destructive/10 p-2 rounded-lg"><Trash2 className="h-4 w-4 text-destructive" /></div>
+              <span className="text-sm font-medium text-destructive">Delete Chat History</span>
+            </button>
+            <button
+              onClick={() => setConfirmBlock(true)}
+              className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-muted/50 text-left"
+            >
+              <div className="bg-destructive/10 p-2 rounded-lg">
+                {blocked ? <ShieldCheck className="h-4 w-4 text-destructive" /> : <ShieldOff className="h-4 w-4 text-destructive" />}
+              </div>
+              <span className="text-sm font-medium text-destructive">{blocked ? 'Unblock User' : 'Block User'}</span>
+            </button>
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Delete history confirmation */}
+      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <AlertDialogContent className="rounded-2xl max-w-xs">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete chat history?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently deletes all messages in this conversation for both participants. This can't be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteHistory} className="rounded-xl bg-destructive hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Block confirmation */}
+      <AlertDialog open={confirmBlock} onOpenChange={setConfirmBlock}>
+        <AlertDialogContent className="rounded-2xl max-w-xs">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{blocked ? `Unblock ${chat.name}?` : `Block ${chat.name}?`}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {blocked
+                ? "They'll be able to message and call you again."
+                : "They won't be able to send you messages or call you."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleToggleBlock} className="rounded-xl bg-destructive hover:bg-destructive/90">
+              {blocked ? 'Unblock' : 'Block'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
