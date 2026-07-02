@@ -286,6 +286,8 @@ function friendlyAuthError(code?: string) {
     case "auth/configuration-not-found":
     case "auth/invalid-api-key":
       return "Firebase isn't configured yet. Add your project keys to .env.local.";
+    case "auth/unauthorized-domain":
+      return "This domain is not authorized for Google sign-in. Add the Vercel URL to Firebase Auth authorized domains.";
     case "auth/invalid-phone-number":
       return "That phone number is invalid. Use E.164 format like +1234567890.";
     case "auth/missing-phone-number":
