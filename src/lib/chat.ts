@@ -43,6 +43,9 @@ export interface DirectoryUser {
   photoURL: string;
   status?: string;
   online?: boolean;
+  friends?: string[];
+  incomingRequests?: string[];
+  outgoingRequests?: string[];
 }
 
 // Deterministic chat id for a 1:1 conversation between two users.
@@ -72,13 +75,15 @@ export function subscribeChats(
 ) {
   const q = query(
     collection(db, "chats"),
-    where("participants", "array-contains", uid),
-    orderBy("lastMessageAt", "desc")
+    where("participants", "array-contains", uid)
   );
   return onSnapshot(q, (snap) => {
-    cb(
-      snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) } as ChatSummary))
+    const chats = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) } as ChatSummary));
+    chats.sort(
+      (a, b) =>
+        (b.lastMessageAt as any)?.toMillis?.() - (a.lastMessageAt as any)?.toMillis?.()
     );
+    cb(chats);
   });
 }
 
@@ -143,6 +148,50 @@ export async function unblockUser(myUid: string, otherUid: string) {
   });
 }
 
+export async function sendFriendRequest(myUid: string, otherUid: string) {
+  await updateDoc(doc(db, "users", myUid), {
+    outgoingRequests: arrayUnion(otherUid),
+  });
+  await updateDoc(doc(db, "users", otherUid), {
+    incomingRequests: arrayUnion(myUid),
+  });
+}
+
+export async function cancelFriendRequest(myUid: string, otherUid: string) {
+  await updateDoc(doc(db, "users", myUid), {
+    outgoingRequests: arrayRemove(otherUid),
+  });
+  await updateDoc(doc(db, "users", otherUid), {
+    incomingRequests: arrayRemove(myUid),
+  });
+}
+
+export async function acceptFriendRequest(myUid: string, otherUid: string) {
+  await updateDoc(doc(db, "users", myUid), {
+    incomingRequests: arrayRemove(otherUid),
+    friends: arrayUnion(otherUid),
+  });
+  await updateDoc(doc(db, "users", otherUid), {
+    outgoingRequests: arrayRemove(myUid),
+    friends: arrayUnion(myUid),
+  });
+
+  const chatId = await ensureChat(myUid, otherUid);
+  await updateDoc(doc(db, "chats", chatId), {
+    lastMessage: "You are now friends.",
+    lastMessageAt: serverTimestamp(),
+  });
+}
+
+export async function rejectFriendRequest(myUid: string, otherUid: string) {
+  await updateDoc(doc(db, "users", myUid), {
+    incomingRequests: arrayRemove(otherUid),
+  });
+  await updateDoc(doc(db, "users", otherUid), {
+    outgoingRequests: arrayRemove(myUid),
+  });
+}
+
 export function subscribeDirectory(
   myUid: string,
   cb: (users: DirectoryUser[]) => void
@@ -159,6 +208,9 @@ export function subscribeDirectory(
           photoURL: u.photoURL,
           status: u.status,
           online: u.online,
+          friends: u.friends || [],
+          incomingRequests: u.incomingRequests || [],
+          outgoingRequests: u.outgoingRequests || [],
         }))
     );
   });

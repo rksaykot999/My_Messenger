@@ -1,6 +1,7 @@
 import { initializeApp, getApps, getApp, type FirebaseOptions } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
 
 // These values come from your Firebase project settings.
 // Create a `.env.local` file (see `.env.local.example`) and fill them in.
@@ -33,3 +34,4 @@ export const app = getApps().length
 
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+export const storage = getStorage(app);

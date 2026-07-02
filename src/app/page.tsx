@@ -1,9 +1,9 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { onSnapshot, doc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { onSnapshot, doc, updateDoc } from "firebase/firestore";
+import { db, storage as firebaseStorage } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { BottomNav, TabType } from "@/components/messaging/BottomNav";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -23,6 +23,10 @@ import {
   subscribeChats,
   subscribeDirectory,
   markChatRead,
+  sendFriendRequest,
+  cancelFriendRequest,
+  acceptFriendRequest,
+  rejectFriendRequest,
   type ChatSummary,
   type DirectoryUser,
 } from "@/lib/chat";
@@ -30,8 +34,9 @@ import { subscribeCallHistory, type CallDoc } from "@/lib/webrtc";
 import { useCallManager } from "@/hooks/use-call-manager";
 import { useMessageNotifications } from "@/hooks/use-message-notifications";
 import { updateProfile } from "firebase/auth";
-import { doc as fsDoc, deleteDoc, updateDoc } from "firebase/firestore";
+import { doc as fsDoc, deleteDoc } from "firebase/firestore";
 import { auth } from "@/lib/firebase";
+import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
 
 type SettingsView = 'main' | 'security' | 'theme' | 'language' | 'privacy';
 
@@ -58,13 +63,21 @@ export default function MessengerApp() {
   const [directory, setDirectory] = useState<DirectoryUser[]>([]);
   const [callHistory, setCallHistory] = useState<Array<CallDoc & { id: string }>>([]);
   const [blockedUsers, setBlockedUsers] = useState<string[]>([]);
+  const [myFriends, setMyFriends] = useState<string[]>([]);
+  const [outgoingRequests, setOutgoingRequests] = useState<string[]>([]);
+  const [incomingRequests, setIncomingRequests] = useState<string[]>([]);
   const [selectedOtherUid, setSelectedOtherUid] = useState<string | null>(null);
 
   const [settingsView, setSettingsView] = useState<SettingsView>('main');
   const [isProfileEditing, setIsProfileEditing] = useState(false);
   const [editName, setEditName] = useState('');
   const [editStatus, setEditStatus] = useState('');
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const callManager = useCallManager();
 
@@ -79,7 +92,11 @@ export default function MessengerApp() {
     const unsub2 = subscribeDirectory(user.uid, setDirectory);
     const unsub3 = subscribeCallHistory(user.uid, setCallHistory);
     const unsub4 = onSnapshot(doc(db, "users", user.uid), (snap) => {
-      setBlockedUsers((snap.data() as any)?.blockedUsers || []);
+      const data = snap.data() as any;
+      setBlockedUsers(data?.blockedUsers || []);
+      setMyFriends(data?.friends || []);
+      setOutgoingRequests(data?.outgoingRequests || []);
+      setIncomingRequests(data?.incomingRequests || []);
     });
     return () => {
       unsub1();
@@ -151,14 +168,110 @@ export default function MessengerApp() {
 
   const selectedPerson = selectedOtherUid ? directoryMap[selectedOtherUid] : null;
 
+  const handleSendFriendRequest = async (otherUid: string) => {
+    if (!user) return;
+    try {
+      await sendFriendRequest(user.uid, otherUid);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const handleCancelFriendRequest = async (otherUid: string) => {
+    if (!user) return;
+    try {
+      await cancelFriendRequest(user.uid, otherUid);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const handleAcceptFriendRequest = async (otherUid: string) => {
+    if (!user) return;
+    try {
+      await acceptFriendRequest(user.uid, otherUid);
+      setSelectedOtherUid(otherUid);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const handleRejectFriendRequest = async (otherUid: string) => {
+    if (!user) return;
+    try {
+      await rejectFriendRequest(user.uid, otherUid);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const handlePhotoSelection = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handlePhotoFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setPhotoFile(file);
+    setPhotoPreview(URL.createObjectURL(file));
+  };
+
+  useEffect(() => {
+    return () => {
+      if (photoPreview?.startsWith('blob:')) {
+        URL.revokeObjectURL(photoPreview);
+      }
+    };
+  }, [photoPreview]);
+
   const handleSaveProfile = async () => {
     if (!auth.currentUser) return;
-    await updateProfile(auth.currentUser, { displayName: editName });
+
+    let photoURL = profile?.photoURL;
+
+    if (photoFile) {
+      setIsUploadingPhoto(true);
+      const storageRef = ref(
+        firebaseStorage,
+        `profilePhotos/${auth.currentUser.uid}/${Date.now()}_${photoFile.name}`
+      );
+      const uploadTask = uploadBytesResumable(storageRef, photoFile);
+
+      await new Promise<void>((resolve, reject) => {
+        uploadTask.on(
+          'state_changed',
+          (snapshot) => {
+            const progress = Math.round(
+              (snapshot.bytesTransferred / snapshot.totalBytes) * 100
+            );
+            setUploadProgress(progress);
+          },
+          (error) => reject(error),
+          async () => {
+            photoURL = await getDownloadURL(uploadTask.snapshot.ref);
+            resolve();
+          }
+        );
+      }).finally(() => {
+        setIsUploadingPhoto(false);
+      });
+    }
+
+    await updateProfile(auth.currentUser, {
+      displayName: editName,
+      photoURL,
+    });
+
     await updateDoc(fsDoc(db, "users", auth.currentUser.uid), {
       name: editName,
       status: editStatus,
+      photoURL,
     });
+
     setIsProfileEditing(false);
+    setPhotoFile(null);
+    setPhotoPreview(null);
+    setUploadProgress(0);
   };
 
   if (loading || !user) {
@@ -306,27 +419,77 @@ export default function MessengerApp() {
                     No one else has signed up yet — invite a friend!
                   </p>
                 )}
-                {filteredDirectory.map((person) => (
-                  <button
-                    key={person.uid}
-                    onClick={() => setSelectedOtherUid(person.uid)}
-                    className="flex items-center justify-between group"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="relative">
-                        <Avatar className="h-12 w-12">
-                          <AvatarImage src={person.photoURL} />
-                          <AvatarFallback>{person.name[0]}</AvatarFallback>
-                        </Avatar>
-                        {person.online && <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-background rounded-full" />}
+                {filteredDirectory.map((person) => {
+                  const isFriend = myFriends.includes(person.uid);
+                  const hasOutgoing = outgoingRequests.includes(person.uid);
+                  const hasIncoming = incomingRequests.includes(person.uid);
+                  return (
+                    <div key={person.uid} className="rounded-3xl border border-border/70 bg-card p-4 flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="relative">
+                          <Avatar className="h-12 w-12">
+                            <AvatarImage src={person.photoURL} />
+                            <AvatarFallback>{person.name[0]}</AvatarFallback>
+                          </Avatar>
+                          {person.online && <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-background rounded-full" />}
+                        </div>
+                        <div className="min-w-0">
+                          <h4 className="text-sm font-semibold truncate">{person.name}</h4>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {person.status || (person.online ? 'Online' : 'Offline')}
+                          </p>
+                          {isFriend && <p className="text-[10px] text-foreground/70 mt-1">Friend</p>}
+                          {hasOutgoing && <p className="text-[10px] text-muted-foreground mt-1">Friend request sent</p>}
+                          {hasIncoming && <p className="text-[10px] text-primary mt-1">Incoming request</p>}
+                        </div>
                       </div>
-                      <div className="text-left">
-                        <h4 className="text-sm font-semibold">{person.name}</h4>
-                        <p className="text-xs text-muted-foreground">{person.status || (person.online ? 'Online' : 'Offline')}</p>
+                      <div className="flex flex-col gap-2 shrink-0">
+                        {isFriend ? (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => setSelectedOtherUid(person.uid)}
+                          >
+                            Message
+                          </Button>
+                        ) : hasIncoming ? (
+                          <div className="flex gap-2">
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => handleAcceptFriendRequest(person.uid)}
+                            >
+                              Accept
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleRejectFriendRequest(person.uid)}
+                            >
+                              Reject
+                            </Button>
+                          </div>
+                        ) : hasOutgoing ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleCancelFriendRequest(person.uid)}
+                          >
+                            Cancel
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="default"
+                            size="sm"
+                            onClick={() => handleSendFriendRequest(person.uid)}
+                          >
+                            Add Friend
+                          </Button>
+                        )}
                       </div>
                     </div>
-                  </button>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -571,11 +734,32 @@ export default function MessengerApp() {
             <DialogDescription>Update your personal information here.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="flex justify-center">
-              <Avatar className="h-20 w-20">
-                <AvatarImage src={profile?.photoURL} />
-                <AvatarFallback>{profile?.name?.[0]}</AvatarFallback>
-              </Avatar>
+                  <div className="flex flex-col items-center gap-4">
+              <button
+                type="button"
+                onClick={handlePhotoSelection}
+                className="relative rounded-full border border-muted/60 p-1 hover:ring-2 hover:ring-accent transition-all"
+              >
+                <Avatar className="h-20 w-20">
+                  <AvatarImage src={photoPreview || profile?.photoURL} />
+                  <AvatarFallback>{profile?.name?.[0]}</AvatarFallback>
+                </Avatar>
+                <div className="absolute -bottom-0.5 right-0.5 bg-accent text-white rounded-full p-1 shadow-lg">
+                  <Plus className="h-3.5 w-3.5" />
+                </div>
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handlePhotoFileChange}
+              />
+              {isUploadingPhoto && (
+                <div className="w-full rounded-full bg-muted/30 h-2 overflow-hidden">
+                  <div className="h-2 bg-accent transition-all" style={{ width: `${uploadProgress}%` }} />
+                </div>
+              )}
             </div>
             <div className="space-y-2">
               <label className="text-[10px] font-bold uppercase tracking-wider ml-1">Display Name</label>
