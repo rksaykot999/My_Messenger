@@ -78,14 +78,24 @@ export function ChatView({ chat, onBack, onCall, isBlocked }: ChatViewProps) {
   }, [messages]);
 
   const handleSend = async () => {
-    if (!inputText.trim() || !user || !chatId) return;
+    if (!inputText.trim() || !user) return;
+    if (!chatId) {
+      toast({ title: "Chat not ready", description: "Please wait a moment before sending your first message." });
+      return;
+    }
     if (blocked) {
       toast({ title: "You've blocked this user", description: "Unblock them to send a message." });
       return;
     }
     const text = inputText;
     setInputText("");
-    await sendMessage(chatId, user.uid, text);
+    try {
+      await sendMessage(chatId, user.uid, text);
+    } catch (err) {
+      console.error("Failed to send message", err);
+      toast({ title: "Message not sent", description: "There was a problem sending your message. Please try again." });
+      setInputText(text);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -233,10 +243,10 @@ export function ChatView({ chat, onBack, onCall, isBlocked }: ChatViewProps) {
 
           <Button
             onClick={handleSend}
-            disabled={!inputText.trim() || blocked}
+            disabled={!chatId || !inputText.trim() || blocked}
             className={cn(
               "shrink-0 h-10 w-10 rounded-full p-0 transition-transform active:scale-95",
-              inputText.trim() && !blocked ? "bg-accent hover:bg-accent/90" : "bg-muted text-muted-foreground"
+              chatId && inputText.trim() && !blocked ? "bg-accent hover:bg-accent/90" : "bg-muted text-muted-foreground"
             )}
           >
             <Send className="h-5 w-5 ml-0.5" />
