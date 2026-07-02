@@ -38,6 +38,7 @@ import { updateProfile } from "firebase/auth";
 import { doc as fsDoc, deleteDoc } from "firebase/firestore";
 import { auth } from "@/lib/firebase";
 import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
+import { useToast } from "@/hooks/use-toast";
 
 type SettingsView = 'main' | 'security' | 'theme' | 'language' | 'privacy';
 
@@ -57,6 +58,7 @@ function timeAgo(ts: any) {
 
 export default function MessengerApp() {
   const router = useRouter();
+  const { toast } = useToast();
   const { user, profile, loading, logout, deleteAccount, login, loginWithGoogle, finishDeleteAccount } = useAuth();
 
   const [activeTab, setActiveTab] = useState<TabType>('chats');
@@ -178,8 +180,9 @@ export default function MessengerApp() {
     if (!user) return;
     try {
       await sendFriendRequest(user.uid, otherUid);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
+      toast({ title: "Couldn't send friend request", description: error?.message || "Please try again." });
     }
   };
 
@@ -187,8 +190,9 @@ export default function MessengerApp() {
     if (!user) return;
     try {
       await cancelFriendRequest(user.uid, otherUid);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
+      toast({ title: "Couldn't cancel request", description: error?.message || "Please try again." });
     }
   };
 
@@ -198,8 +202,9 @@ export default function MessengerApp() {
       await acceptFriendRequest(user.uid, otherUid);
       setActiveTab('chats');
       setSelectedOtherUid(otherUid);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
+      toast({ title: "Couldn't accept request", description: error?.message || "Please try again." });
     }
   };
 
@@ -207,8 +212,9 @@ export default function MessengerApp() {
     if (!user) return;
     try {
       await rejectFriendRequest(user.uid, otherUid);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
+      toast({ title: "Couldn't reject request", description: error?.message || "Please try again." });
     }
   };
 
@@ -236,49 +242,57 @@ export default function MessengerApp() {
 
     let photoURL = profile?.photoURL;
 
-    if (photoFile) {
-      setIsUploadingPhoto(true);
-      const storageRef = ref(
-        firebaseStorage,
-        `profilePhotos/${auth.currentUser.uid}/${Date.now()}_${photoFile.name}`
-      );
-      const uploadTask = uploadBytesResumable(storageRef, photoFile);
-
-      await new Promise<void>((resolve, reject) => {
-        uploadTask.on(
-          'state_changed',
-          (snapshot) => {
-            const progress = Math.round(
-              (snapshot.bytesTransferred / snapshot.totalBytes) * 100
-            );
-            setUploadProgress(progress);
-          },
-          (error) => reject(error),
-          async () => {
-            photoURL = await getDownloadURL(uploadTask.snapshot.ref);
-            resolve();
-          }
+    try {
+      if (photoFile) {
+        setIsUploadingPhoto(true);
+        const storageRef = ref(
+          firebaseStorage,
+          `profilePhotos/${auth.currentUser.uid}/${Date.now()}_${photoFile.name}`
         );
-      }).finally(() => {
-        setIsUploadingPhoto(false);
+        const uploadTask = uploadBytesResumable(storageRef, photoFile);
+
+        await new Promise<void>((resolve, reject) => {
+          uploadTask.on(
+            'state_changed',
+            (snapshot) => {
+              const progress = Math.round(
+                (snapshot.bytesTransferred / snapshot.totalBytes) * 100
+              );
+              setUploadProgress(progress);
+            },
+            (error) => reject(error),
+            async () => {
+              photoURL = await getDownloadURL(uploadTask.snapshot.ref);
+              resolve();
+            }
+          );
+        }).finally(() => {
+          setIsUploadingPhoto(false);
+        });
+      }
+
+      await updateProfile(auth.currentUser, {
+        displayName: editName,
+        photoURL,
+      });
+
+      await updateDoc(fsDoc(db, "users", auth.currentUser.uid), {
+        name: editName,
+        status: editStatus,
+        photoURL,
+      });
+
+      setIsProfileEditing(false);
+      setPhotoFile(null);
+      setPhotoPreview(null);
+      setUploadProgress(0);
+    } catch (error: any) {
+      console.error("Failed to save profile", error);
+      toast({
+        title: "Couldn't save profile",
+        description: error?.code ? `${error.code}: ${error.message}` : "Please try again.",
       });
     }
-
-    await updateProfile(auth.currentUser, {
-      displayName: editName,
-      photoURL,
-    });
-
-    await updateDoc(fsDoc(db, "users", auth.currentUser.uid), {
-      name: editName,
-      status: editStatus,
-      photoURL,
-    });
-
-    setIsProfileEditing(false);
-    setPhotoFile(null);
-    setPhotoPreview(null);
-    setUploadProgress(0);
   };
 
   if (loading || !user) {

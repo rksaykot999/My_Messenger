@@ -23,6 +23,7 @@ import {
   arrayRemove,
   collection,
   doc,
+  getDoc,
   getDocs,
   query,
   setDoc,
@@ -75,8 +76,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           status: "Hey there! I'm using My Messenger.",
         });
         try {
+          const userRef = doc(db, "users", firebaseUser.uid);
+          const existing = await getDoc(userRef);
           await setDoc(
-            doc(db, "users", firebaseUser.uid),
+            userRef,
             {
               uid: firebaseUser.uid,
               name: firebaseUser.displayName || "User",
@@ -86,9 +89,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 `https://picsum.photos/seed/${firebaseUser.uid}/200/200`,
               online: true,
               lastSeen: serverTimestamp(),
-              friends: [],
-              incomingRequests: [],
-              outgoingRequests: [],
+              // Only set these on the very first sign-in (e.g. first Google
+              // login) — never again, or we'd wipe existing friend data
+              // every time this listener re-fires on page load.
+              ...(existing.exists()
+                ? {}
+                : {
+                    status: "Hey there! I'm using My Messenger.",
+                    createdAt: serverTimestamp(),
+                    blockedUsers: [],
+                    friends: [],
+                    incomingRequests: [],
+                    outgoingRequests: [],
+                  }),
             },
             { merge: true }
           );

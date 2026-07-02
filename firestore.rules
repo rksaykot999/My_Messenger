@@ -93,6 +93,7 @@ service cloud.firestore {
     // A chat can only be read/written by its two participants.
     match /chats/{chatId} {
       allow read, update, delete: if isSignedIn() && request.auth.uid in resource.data.participants;
+      allow create: if isSignedIn() && request.auth.uid in request.resource.data.participants;
 
       match /messages/{messageId} {
         allow read: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;

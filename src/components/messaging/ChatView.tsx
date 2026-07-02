@@ -62,13 +62,22 @@ export function ChatView({ chat, onBack, onCall, isBlocked }: ChatViewProps) {
     if (!user) return;
     let unsub: (() => void) | undefined;
     (async () => {
-      const id = await ensureChat(user.uid, chat.id);
-      setChatId(id);
-      await markChatRead(id, user.uid);
-      clearNotificationsForChat(id);
-      unsub = subscribeMessages(id, setMessages);
+      try {
+        const id = await ensureChat(user.uid, chat.id);
+        setChatId(id);
+        await markChatRead(id, user.uid);
+        clearNotificationsForChat(id);
+        unsub = subscribeMessages(id, setMessages);
+      } catch (err: any) {
+        console.error("Failed to open chat", err?.code || err?.message || err);
+        toast({
+          title: "Couldn't open this conversation",
+          description: err?.code ? `${err.code}: ${err.message}` : "Please check your connection and try again.",
+        });
+      }
     })();
     return () => unsub?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, chat.id]);
 
   useEffect(() => {

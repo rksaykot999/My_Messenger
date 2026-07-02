@@ -1,54 +1,108 @@
 # My Messenger
 
-A real-time messaging app (Next.js + Firebase) with login/signup, live chat,
-voice/video calling, and browser notifications.
+A real-time messaging app (Next.js + Firebase) — login/signup, live chat,
+friend requests, voice/video calling, and browser notifications.
 
-## What changed in this version
+## ⚠️ Critical step after downloading this update
 
-- **Login / Sign Up** — Firebase Authentication (email + password). Signed-out
-  visitors land on `/login`; signed-in visitors go straight to the app.
-- **Realtime messaging** — Chats and messages are stored in **Cloud
-  Firestore** and update live with `onSnapshot`, no more mock data.
-- **Working audio/video calls** — Real peer-to-peer calls using **WebRTC**,
-  signaled through Firestore (`calls/{callId}` docs + ICE-candidate
-  subcollections). Mute, speaker toggle, camera on/off, and hang up all work.
-- **Chat menu** — The chat header's "Chat with AI" sparkle button was
-  replaced with an **ⓘ Info button** that opens a sheet with *View Contact
-  Info*, *Delete Chat History*, and *Block/Unblock User*.
-- **Notifications** — When a message arrives for a chat you're not currently
-  viewing, a browser notification appears; it's automatically dismissed the
-  moment you open that conversation (uses the Notification API with a
-  per-chat `tag`).
+The code fixes below **will not take effect until you redeploy
+`firestore.rules`** (and `storage.rules`) to your Firebase project. Rules
+live on Firebase's servers, not in your app's bundle — editing the file in
+this repo does nothing by itself.
 
-## 1. Create a Firebase project
+**Firebase Console → Firestore Database → Rules tab** → paste the contents
+of `firestore.rules` → **Publish**.
 
-1. Go to <https://console.firebase.google.com/> → **Add project** (it's free
-   on the Spark plan).
-2. **Build → Authentication → Get started → Sign-in method** → enable
-   **Email/Password**.
-3. **Build → Firestore Database → Create database** → start in **production
-   mode** (the included `firestore.rules` will lock it down properly) → pick
-   any region.
-4. **Project settings (gear icon) → General → Your apps → Web (`</>`)** →
-   register an app → copy the `firebaseConfig` values.
-5. Deploy `firestore.rules` from this project via the Firebase console's
-   Firestore **Rules** tab (paste the file's contents), or with the CLI:
-   ```bash
-   npm install -g firebase-tools
-   firebase login
-   firebase init firestore   # point it at this project
-   firebase deploy --only firestore:rules
-   ```
+**Firebase Console → Storage → Rules tab** → paste the contents of
+`storage.rules` → **Publish**. (Storage rules are new in this update — Storage
+had no rules configured before, so profile-photo uploads were being silently
+rejected.)
 
-## 2. Configure environment variables
+Or via CLI:
+```bash
+firebase deploy --only firestore:rules,storage:rules
+```
+
+## Bugs found and fixed in this update
+
+1. **Messaging didn't work at all** — `firestore.rules` had `allow read,
+   update, delete` for the `chats` collection but no `allow create`. Every
+   time two people tried to start a new conversation, Firestore silently
+   rejected the chat-creation write (permission-denied), so the chat view
+   never loaded and nothing could be sent. Fixed by adding the missing
+   `create` rule.
+
+2. **Friend requests appeared to send/accept but didn't stick** —
+   `AuthContext`'s sign-in listener was resetting `friends`,
+   `incomingRequests`, and `outgoingRequests` back to empty arrays *every
+   time the app loaded* (including simple page refreshes), because it
+   `setDoc(..., { merge: true })`'d those fields on every auth-state change.
+   `merge: true` only protects fields you don't mention — these were
+   explicitly included, so they got overwritten. Fixed so those fields are
+   only ever initialized once, on first sign-in.
+
+3. **Calling appeared broken** — this was a knock-on effect of bug #1:
+   calls are started from inside a chat, and chats couldn't be created, so
+   there was never a way to reach the call button in practice. The WebRTC
+   calling code itself was already correct and works once you can get into
+   a chat.
+
+4. **Notifications appeared broken** — also a knock-on effect of bug #1: no
+   messages were ever successfully written, so there was nothing to notify
+   about.
+
+5. **Profile photo upload had no Storage rules** — added `storage.rules` so
+   a signed-in user can upload/replace only their own profile photo
+   (`profilePhotos/{their-uid}/...`), and anyone signed in can view photos.
+
+6. Removed a hardcoded fallback Firebase API key that had been placed
+   directly in `src/lib/firebase.ts` as a workaround for an earlier
+   "api-key-not-valid" error. That error was actually caused by `.env.local`
+   not being loaded yet (fixed by properly setting `.env.local` + restarting
+   the dev server) — hardcoding real project credentials into source code
+   isn't good practice, so it's been reverted to a safe placeholder fallback
+   now that env loading is confirmed working.
+
+7. Cleaned up the now-unused Genkit "Chat with AI" source files
+   (`src/ai/`, `AIChatView.tsx`) that were dead code left over from an
+   earlier version.
+
+8. Added error handling (toasts) to friend-request actions, chat setup, and
+   profile saving, so future failures show a message instead of failing
+   silently in the console — this will make debugging much faster next time.
+
+## 1. Create/confirm your Firebase project
+
+1. <https://console.firebase.google.com/> → your project (or **Add
+   project**, free Spark plan).
+2. **Build → Authentication → Sign-in method** → **Email/Password** enabled
+   (and **Google**, if you want the Google sign-in button to work).
+3. **Build → Firestore Database** → created, production mode.
+4. **Build → Storage** → created (needed for profile photos).
+5. **Project settings → General → Your apps** → copy the `firebaseConfig`
+   values into `.env.local` (see below).
+6. Deploy `firestore.rules` and `storage.rules` (see the critical step
+   above) — **do this every time you change either file**.
+
+## 2. Environment variables
 
 ```bash
 cp .env.local.example .env.local
 ```
 
-Fill in the six `NEXT_PUBLIC_FIREBASE_*` values from step 1.4. Without these,
-the app still runs but shows a "Firebase isn't configured" error on
-login/signup.
+Fill in the six `NEXT_PUBLIC_FIREBASE_*` values, no quotes needed:
+
+```
+NEXT_PUBLIC_FIREBASE_API_KEY=AIzaSy...
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=your-project
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your-project.firebasestorage.app
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=123456789012
+NEXT_PUBLIC_FIREBASE_APP_ID=1:123456789012:web:abc123
+```
+
+**After editing `.env.local`, always fully restart `npm run dev`** — Next.js
+only reads env files at server startup, not on hot-reload.
 
 ## 3. Run it
 
@@ -57,21 +111,29 @@ npm install
 npm run dev
 ```
 
-Open two different browsers (or one normal + one incognito window) and sign
-up with two different accounts to test chatting and calling between them.
+Test with two accounts (a normal window + an incognito window): sign up as
+both, send a friend request from one, accept it from the other, then chat
+and call between them.
 
 ## Notes & limitations
 
-- **Calling** uses public Google STUN servers only. This covers most
-  same-network or straightforward NAT setups. For reliable calling across
-  arbitrary networks in production, add a TURN server (e.g. a free tier from
-  Twilio, Cloudflare, or `coturn` you host) to the `iceServers` list in
-  `src/lib/webrtc.ts`.
-- **Notifications** use the browser's Notification API. They fire while the
-  tab is open in the background. For true push notifications when the app/
-  tab is fully closed, you'd add Firebase Cloud Messaging (FCM) with a
-  service worker — a good next step, not included here to keep the setup
-  simple and free.
-- Take a look at `src/app/page.tsx` for the main app shell, `src/lib/chat.ts`
-  for Firestore chat helpers, `src/lib/webrtc.ts` for the calling logic, and
-  `src/contexts/AuthContext.tsx` for auth.
+- **Calling** uses public Google STUN servers only. For reliable calling
+  across arbitrary networks in production, add a TURN server to the
+  `iceServers` list in `src/lib/webrtc.ts`.
+- **Notifications** use the browser's Notification API and fire while the
+  tab is open in the background (not when the browser is fully closed). For
+  true closed-app push notifications, add Firebase Cloud Messaging (FCM)
+  with a service worker.
+- Grant notification + camera/microphone permission when your browser
+  prompts for them, or those features will silently no-op.
+
+## Where things live
+
+- `src/app/page.tsx` — main app shell (chats, people/friends, calls, settings)
+- `src/lib/chat.ts` — Firestore chat + friend-request helpers
+- `src/lib/webrtc.ts` — WebRTC calling logic
+- `src/contexts/AuthContext.tsx` — auth state, sign up/in/out, account deletion
+- `src/hooks/use-call-manager.ts` — call state management
+- `src/hooks/use-message-notifications.ts` — notification logic
+- `firestore.rules` / `storage.rules` — server-side security rules (must be
+  deployed to Firebase, not just present in this repo)
