@@ -11,8 +11,11 @@ import {
   onAuthStateChanged,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
+  signInWithPopup,
+  GoogleAuthProvider,
   signOut,
   updateProfile,
+  deleteUser,
   User,
 } from "firebase/auth";
 import {
@@ -37,7 +40,9 @@ interface AuthContextValue {
   loading: boolean;
   signup: (name: string, email: string, password: string) => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
+  deleteAccount: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -124,6 +129,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await signInWithEmailAndPassword(auth, email, password);
   };
 
+  const loginWithGoogle = async () => {
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: "select_account" });
+    await signInWithPopup(auth, provider);
+  };
+
   const logout = async () => {
     if (auth.currentUser) {
       try {
@@ -136,8 +147,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await signOut(auth);
   };
 
+  const deleteAccount = async () => {
+    if (!auth.currentUser) throw new Error("No user is currently signed in.");
+    try {
+      const uid = auth.currentUser.uid;
+      await deleteUser(auth.currentUser);
+      await deleteDoc(doc(db, "users", uid));
+    } catch (error) {
+      console.error("Failed to delete account", error);
+      throw error;
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signup, login, logout }}>
+    <AuthContext.Provider value={{ user, profile, loading, signup, login, loginWithGoogle, logout, deleteAccount }}>
       {children}
     </AuthContext.Provider>
   );

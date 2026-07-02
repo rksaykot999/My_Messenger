@@ -6,12 +6,11 @@ export type TabType = 'chats' | 'discover' | 'calls' | 'settings';
 interface BottomNavProps {
   activeTab: TabType;
   onTabChange: (tab: TabType) => void;
-  unreadCount?: number;
 }
 
-export function BottomNav({ activeTab, onTabChange, unreadCount = 0 }: BottomNavProps) {
+export function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
   const tabs = [
-    { id: 'chats', label: 'Chats', icon: MessageSquare, badge: unreadCount },
+    { id: 'chats', label: 'Chats', icon: MessageSquare },
     { id: 'discover', label: 'Discover', icon: Globe },
     { id: 'calls', label: 'Calls', icon: Phone },
     { id: 'settings', label: 'Settings', icon: Settings },

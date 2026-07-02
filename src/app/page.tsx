@@ -30,7 +30,7 @@ import { subscribeCallHistory, type CallDoc } from "@/lib/webrtc";
 import { useCallManager } from "@/hooks/use-call-manager";
 import { useMessageNotifications } from "@/hooks/use-message-notifications";
 import { updateProfile } from "firebase/auth";
-import { doc as fsDoc, updateDoc } from "firebase/firestore";
+import { doc as fsDoc, deleteDoc, updateDoc } from "firebase/firestore";
 import { auth } from "@/lib/firebase";
 
 type SettingsView = 'main' | 'security' | 'theme' | 'language' | 'privacy';
@@ -51,7 +51,7 @@ function timeAgo(ts: any) {
 
 export default function MessengerApp() {
   const router = useRouter();
-  const { user, profile, loading, logout } = useAuth();
+  const { user, profile, loading, logout, deleteAccount } = useAuth();
 
   const [activeTab, setActiveTab] = useState<TabType>('chats');
   const [chats, setChats] = useState<ChatSummary[]>([]);
@@ -463,14 +463,32 @@ export default function MessengerApp() {
                     </div>
                   </section>
 
-                  <Button
-                    variant="ghost"
-                    onClick={() => logout()}
-                    className="w-full text-destructive hover:text-destructive hover:bg-destructive/10 rounded-2xl h-12"
-                  >
-                    <LogOut className="h-4 w-4 mr-2" />
-                    Log Out
-                  </Button>
+                  <div className="space-y-3">
+                    <Button
+                      variant="ghost"
+                      onClick={() => logout()}
+                      className="w-full text-destructive hover:text-destructive hover:bg-destructive/10 rounded-2xl h-12"
+                    >
+                      <LogOut className="h-4 w-4 mr-2" />
+                      Log Out
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      onClick={async () => {
+                        if (confirm('Delete your account? This cannot be undone.')) {
+                          try {
+                            await deleteAccount();
+                          } catch (err) {
+                            console.error(err);
+                            alert('Account deletion failed. Please sign in again and try.');
+                          }
+                        }
+                      }}
+                      className="w-full rounded-2xl h-12"
+                    >
+                      Delete Account
+                    </Button>
+                  </div>
                 </div>
               </>
             ) : (
@@ -543,7 +561,7 @@ export default function MessengerApp() {
         )}
       </main>
 
-      <BottomNav activeTab={activeTab} onTabChange={setActiveTab} unreadCount={totalUnread} />
+      <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
 
       {/* Edit Profile Dialog */}
       <Dialog open={isProfileEditing} onOpenChange={setIsProfileEditing}>

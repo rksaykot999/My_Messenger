@@ -207,14 +207,13 @@ export function subscribeIncomingCalls(
   uid: string,
   cb: (call: (CallDoc & { id: string }) | null) => void
 ) {
-  const q = query(
-    collection(db, "calls"),
-    where("calleeId", "==", uid),
-    where("status", "==", "ringing")
-  );
+  const q = query(collection(db, "calls"), where("calleeId", "==", uid));
   return onSnapshot(q, (snap) => {
-    const first = snap.docs[0];
-    cb(first ? ({ id: first.id, ...(first.data() as any) }) : null);
+    const ringingCalls = snap.docs
+      .map((d) => ({ id: d.id, ...(d.data() as any) } as CallDoc & { id: string }))
+      .filter((call) => call.status === "ringing");
+    const first = ringingCalls[0];
+    cb(first || null);
   });
 }
 

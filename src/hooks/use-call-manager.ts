@@ -44,7 +44,7 @@ export function useCallManager() {
 
   // Watch the active call document for status changes (accepted/ended/declined).
   useEffect(() => {
-    if (!activeCall) return;
+    if (!activeCall || !activeCall.callId) return;
     const unsub = subscribeCallDoc(activeCall.callId, (call) => {
       if (!call) return;
       if (call.status === "accepted") {
