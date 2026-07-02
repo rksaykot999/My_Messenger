@@ -56,7 +56,7 @@ function timeAgo(ts: any) {
 
 export default function MessengerApp() {
   const router = useRouter();
-  const { user, profile, loading, logout, deleteAccount } = useAuth();
+  const { user, profile, loading, logout, deleteAccount, login, loginWithGoogle, finishDeleteAccount } = useAuth();
 
   const [activeTab, setActiveTab] = useState<TabType>('chats');
   const [chats, setChats] = useState<ChatSummary[]>([]);
@@ -70,6 +70,11 @@ export default function MessengerApp() {
 
   const [settingsView, setSettingsView] = useState<SettingsView>('main');
   const [isProfileEditing, setIsProfileEditing] = useState(false);
+  const [reauthOpen, setReauthOpen] = useState(false);
+  const [reauthEmail, setReauthEmail] = useState('');
+  const [reauthPassword, setReauthPassword] = useState('');
+  const [reauthError, setReauthError] = useState<string | null>(null);
+  const [reauthSubmitting, setReauthSubmitting] = useState(false);
   const [editName, setEditName] = useState('');
   const [editStatus, setEditStatus] = useState('');
   const [photoFile, setPhotoFile] = useState<File | null>(null);
@@ -648,12 +653,18 @@ export default function MessengerApp() {
                     <Button
                       variant="destructive"
                       onClick={async () => {
-                        if (confirm('Delete your account? This cannot be undone.')) {
-                          try {
-                            await deleteAccount();
-                          } catch (err) {
-                            console.error(err);
-                            alert('Account deletion failed. Please sign in again and try.');
+                        if (!confirm('Delete your account? This cannot be undone.')) return;
+                        try {
+                          await deleteAccount();
+                        } catch (err: any) {
+                          console.error(err);
+                          if (err?.code === 'auth/requires-recent-login') {
+                            setReauthError(null);
+                            setReauthEmail(profile?.email || '');
+                            setReauthPassword('');
+                            setReauthOpen(true);
+                          } else {
+                            alert('Account deletion failed. Please try again.');
                           }
                         }
                       }}
@@ -786,6 +797,74 @@ export default function MessengerApp() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+        <Dialog open={reauthOpen} onOpenChange={setReauthOpen}>
+          <DialogContent className="max-w-xs rounded-3xl">
+            <DialogHeader>
+              <DialogTitle>Re-authenticate</DialogTitle>
+              <DialogDescription>For security, please sign in again to delete your account.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              <div className="space-y-2">
+                <Label htmlFor="reauth-email">Email</Label>
+                <Input id="reauth-email" value={reauthEmail} onChange={(e) => setReauthEmail(e.target.value)} className="rounded-xl bg-muted/50 border-none" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="reauth-password">Password</Label>
+                <Input id="reauth-password" type="password" value={reauthPassword} onChange={(e) => setReauthPassword(e.target.value)} className="rounded-xl bg-muted/50 border-none" />
+              </div>
+              {reauthError && (
+                <p className="text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2">{reauthError}</p>
+              )}
+            </div>
+            <DialogFooter className="flex-row gap-2">
+              <Button variant="ghost" onClick={() => setReauthOpen(false)} className="flex-1 rounded-xl">Cancel</Button>
+              <Button
+                onClick={async () => {
+                  setReauthError(null);
+                  setReauthSubmitting(true);
+                  try {
+                    await login(reauthEmail, reauthPassword);
+                    await finishDeleteAccount();
+                    setReauthOpen(false);
+                    router.replace('/login');
+                  } catch (err: any) {
+                    console.error('Reauth failed', err);
+                    setReauthError(err?.code ? err.message : 'Reauthentication failed.');
+                  } finally {
+                    setReauthSubmitting(false);
+                  }
+                }}
+                className="flex-1 rounded-xl bg-accent hover:bg-accent/90"
+              >
+                Reauthenticate & Delete
+              </Button>
+            </DialogFooter>
+            <div className="px-6 pb-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={async () => {
+                  setReauthError(null);
+                  setReauthSubmitting(true);
+                  try {
+                    await loginWithGoogle();
+                    await finishDeleteAccount();
+                    setReauthOpen(false);
+                    router.replace('/login');
+                  } catch (err) {
+                    console.error('Google reauth failed', err);
+                    setReauthError('Reauthentication failed.');
+                  } finally {
+                    setReauthSubmitting(false);
+                  }
+                }}
+                className="w-full rounded-xl"
+              >
+                Continue with Google
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
     </div>
   );
 }

@@ -51,6 +51,7 @@ interface AuthContextValue {
   loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
   deleteAccount: () => Promise<void>;
+  finishDeleteAccount: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -238,18 +239,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      await deleteUser(auth.currentUser);
+      await finishDeleteAccount();
     } catch (error: any) {
       console.error("Failed to delete account", error);
       if (error.code === "auth/requires-recent-login") {
-        throw new Error("Please sign in again before deleting your account.");
+        throw error;
       }
       throw error;
     }
   };
 
+  const finishDeleteAccount = async () => {
+    if (!auth.currentUser) throw new Error("No user is currently signed in.");
+    try {
+      await deleteUser(auth.currentUser);
+    } catch (error: any) {
+      console.error("Failed to delete auth user", error);
+      if (error.code === "auth/requires-recent-login") throw error;
+      throw error;
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signup, login, loginWithGoogle, logout, deleteAccount }}>
+    <AuthContext.Provider value={{ user, profile, loading, signup, login, loginWithGoogle, logout, deleteAccount, finishDeleteAccount }}>
       {children}
     </AuthContext.Provider>
   );
