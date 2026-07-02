@@ -25,10 +25,10 @@ export const app = getApps().length
       isFirebaseConfigured
         ? firebaseConfig
         : {
-            apiKey: "demo-api-key",
-            authDomain: "demo.firebaseapp.com",
-            projectId: "demo-project",
-            appId: "demo-app-id",
+            apiKey: "AIzaSyCcpoTsFtl6OhJCtULG4b250JxlexU1owY",
+            authDomain: "my-messenger-88ba1.firebaseapp.com",
+            projectId: "my-messenger-88ba1",
+            appId: "1:1038574226468:web:56065c221d5d9d48e31cb1",
           }
     );
 
