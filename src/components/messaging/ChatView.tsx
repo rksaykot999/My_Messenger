@@ -79,18 +79,30 @@ export function ChatView({ chat, onBack, onCall, isBlocked }: ChatViewProps) {
 
   const handleSend = async () => {
     if (!inputText.trim() || !user) return;
-    if (!chatId) {
-      toast({ title: "Chat not ready", description: "Please wait a moment before sending your first message." });
-      return;
-    }
     if (blocked) {
       toast({ title: "You've blocked this user", description: "Unblock them to send a message." });
       return;
     }
+
+    let id = chatId;
+    if (!id) {
+      try {
+        id = await ensureChat(user.uid, chat.id);
+        setChatId(id);
+        await markChatRead(id, user.uid);
+        clearNotificationsForChat(id);
+        subscribeMessages(id, setMessages);
+      } catch (err) {
+        console.error("Failed to initialize chat", err);
+        toast({ title: "Unable to send message", description: "Could not create the chat. Please try again." });
+        return;
+      }
+    }
+
     const text = inputText;
     setInputText("");
     try {
-      await sendMessage(chatId, user.uid, text);
+      await sendMessage(id, user.uid, text);
     } catch (err) {
       console.error("Failed to send message", err);
       toast({ title: "Message not sent", description: "There was a problem sending your message. Please try again." });
