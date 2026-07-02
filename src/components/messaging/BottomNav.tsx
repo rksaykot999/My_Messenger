@@ -19,7 +19,7 @@ export function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-lg border-t border-border px-4 pb-safe pt-2 h-16 z-50">
       <div className="max-w-md mx-auto flex justify-around items-center h-full">
-        {tabs.map(({ id, label, icon: Icon, badge }) => (
+        {tabs.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
             onClick={() => onTabChange(id)}
@@ -35,11 +35,6 @@ export function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
                   activeTab === id ? "scale-110 stroke-[2.5px]" : "stroke-[2px]"
                 )} 
               />
-              {badge && badge > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 bg-accent text-accent-foreground text-[10px] font-bold rounded-full h-4 min-w-4 px-1 flex items-center justify-center border-2 border-background shadow-sm">
-                  {badge > 99 ? '99+' : badge}
-                </span>
-              )}
             </div>
             <span className={cn(
               "text-[10px] font-semibold tracking-tight transition-colors duration-200",

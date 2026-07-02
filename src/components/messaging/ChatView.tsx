@@ -103,9 +103,12 @@ export function ChatView({ chat, onBack, onCall, isBlocked }: ChatViewProps) {
     setInputText("");
     try {
       await sendMessage(id, user.uid, text);
-    } catch (err) {
-      console.error("Failed to send message", err);
-      toast({ title: "Message not sent", description: "There was a problem sending your message. Please try again." });
+    } catch (err: any) {
+      console.error("Failed to send message", err.code || err.message || err);
+      toast({
+        title: "Message not sent",
+        description: err.code ? `${err.code}: ${err.message}` : "There was a problem sending your message. Please try again.",
+      });
       setInputText(text);
     }
   };

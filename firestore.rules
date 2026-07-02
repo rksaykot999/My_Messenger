@@ -10,21 +10,95 @@ service cloud.firestore {
     // Any signed-in user can read the directory (to find people to chat
     // with) but can only write their own profile document.
     match /users/{userId} {
+      function changedKeys() {
+        return request.resource.data.diff(resource.data).affectedKeys();
+      }
+
+      function safeIncomingUpdate() {
+        return changedKeys().hasOnly(["incomingRequests"]);
+      }
+
+      function safeOutgoingUpdate() {
+        return changedKeys().hasOnly(["outgoingRequests"]);
+      }
+
+      function safeOutgoingAccept() {
+        return changedKeys().hasOnly(["outgoingRequests", "friends"])
+          && resource.data.outgoingRequests.size() == request.resource.data.outgoingRequests.size() + 1
+          && request.resource.data.friends.size() == resource.data.friends.size() + 1
+          && request.auth.uid in request.resource.data.friends;
+      }
+
+      function safeFriendRemove() {
+        return changedKeys().hasOnly(["friends"])
+          && resource.data.friends.hasAll(request.resource.data.friends)
+          && resource.data.friends.size() == request.resource.data.friends.size() + 1
+          && request.auth.uid in resource.data.friends
+          && !(request.auth.uid in request.resource.data.friends);
+      }
+
+      function selfRemovedFromFriends() {
+        return resource.data.friends.hasAll(request.resource.data.friends)
+          && resource.data.friends.size() == request.resource.data.friends.size() + 1
+          && request.auth.uid in resource.data.friends
+          && !(request.auth.uid in request.resource.data.friends);
+      }
+
+      function selfRemovedFromIncomingRequests() {
+        return resource.data.incomingRequests.hasAll(request.resource.data.incomingRequests)
+          && resource.data.incomingRequests.size() == request.resource.data.incomingRequests.size() + 1
+          && request.auth.uid in resource.data.incomingRequests
+          && !(request.auth.uid in request.resource.data.incomingRequests);
+      }
+
+      function selfRemovedFromOutgoingRequests() {
+        return resource.data.outgoingRequests.hasAll(request.resource.data.outgoingRequests)
+          && resource.data.outgoingRequests.size() == request.resource.data.outgoingRequests.size() + 1
+          && request.auth.uid in resource.data.outgoingRequests
+          && !(request.auth.uid in request.resource.data.outgoingRequests);
+      }
+
+      function selfRemovedFromBlockedUsers() {
+        return resource.data.blockedUsers.hasAll(request.resource.data.blockedUsers)
+          && resource.data.blockedUsers.size() == request.resource.data.blockedUsers.size() + 1
+          && request.auth.uid in resource.data.blockedUsers
+          && !(request.auth.uid in request.resource.data.blockedUsers);
+      }
+
+      function safeSelfCleanup() {
+        return changedKeys().hasOnly([
+          "friends",
+          "incomingRequests",
+          "outgoingRequests",
+          "blockedUsers",
+        ])
+          && (!changedKeys().hasAny(["friends"]) || selfRemovedFromFriends())
+          && (!changedKeys().hasAny(["incomingRequests"]) || selfRemovedFromIncomingRequests())
+          && (!changedKeys().hasAny(["outgoingRequests"]) || selfRemovedFromOutgoingRequests())
+          && (!changedKeys().hasAny(["blockedUsers"]) || selfRemovedFromBlockedUsers());
+      }
+
       allow read: if isSignedIn();
-      allow create, update: if isSignedIn() && request.auth.uid == userId;
-      allow delete: if false;
+      allow create: if isSignedIn() && request.auth.uid == userId;
+      allow update: if isSignedIn() && (
+        request.auth.uid == userId || (
+          request.auth.uid != userId && (
+            safeIncomingUpdate() || safeOutgoingUpdate() || safeOutgoingAccept() || safeFriendRemove() || safeSelfCleanup()
+          )
+        )
+      );
+      allow delete: if isSignedIn() && request.auth.uid == userId;
     }
 
     // A chat can only be read/written by its two participants.
     match /chats/{chatId} {
-      allow read, update: if isSignedIn() && request.auth.uid in resource.data.participants;
-      allow create: if isSignedIn() && request.auth.uid in request.resource.data.participants;
+      allow read, update, delete: if isSignedIn() && request.auth.uid in resource.data.participants;
 
       match /messages/{messageId} {
         allow read: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
         allow create: if isSignedIn()
-          && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants
-          && request.resource.data.senderId == request.auth.uid;
+          && get(/databases/$(database)/documents/chats/$(chatId)).exists()
+          && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
         allow delete: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
       }
     }
@@ -32,7 +106,7 @@ service cloud.firestore {
     // Calls (WebRTC signaling) — only the caller/callee involved may read or
     // write the offer/answer/candidates for their call.
     match /calls/{callId} {
-      allow read, update: if isSignedIn()
+      allow read, update, delete: if isSignedIn()
         && (request.auth.uid == resource.data.callerId || request.auth.uid == resource.data.calleeId);
       allow create: if isSignedIn() && request.auth.uid == request.resource.data.callerId;
 

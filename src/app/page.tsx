@@ -190,6 +190,7 @@ export default function MessengerApp() {
     if (!user) return;
     try {
       await acceptFriendRequest(user.uid, otherUid);
+      setActiveTab('chats');
       setSelectedOtherUid(otherUid);
     } catch (error) {
       console.error(error);
@@ -625,6 +626,15 @@ export default function MessengerApp() {
                       ))}
                     </div>
                   </section>
+                  {settingsView !== 'main' && (
+                    <Button
+                      variant="ghost"
+                      onClick={() => setSettingsView('main')}
+                      className="w-full rounded-2xl h-12"
+                    >
+                      Back to settings
+                    </Button>
+                  )}
 
                   <div className="space-y-3">
                     <Button

@@ -20,9 +20,16 @@ import {
   User,
 } from "firebase/auth";
 import {
+  arrayRemove,
+  collection,
   doc,
+  getDocs,
+  query,
   setDoc,
   updateDoc,
+  deleteDoc,
+  writeBatch,
+  where,
   serverTimestamp,
 } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
@@ -78,6 +85,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 `https://picsum.photos/seed/${firebaseUser.uid}/200/200`,
               online: true,
               lastSeen: serverTimestamp(),
+              friends: [],
+              incomingRequests: [],
+              outgoingRequests: [],
             },
             { merge: true }
           );
@@ -123,6 +133,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       createdAt: serverTimestamp(),
       lastSeen: serverTimestamp(),
       blockedUsers: [],
+      friends: [],
+      incomingRequests: [],
+      outgoingRequests: [],
     });
   };
 
@@ -159,12 +172,78 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const deleteAccount = async () => {
     if (!auth.currentUser) throw new Error("No user is currently signed in.");
+    const uid = auth.currentUser.uid;
+
     try {
-      const uid = auth.currentUser.uid;
+      const batch = writeBatch(db);
+      batch.delete(doc(db, "users", uid));
+
+      // Clean up chats involving this user.
+      const chatQuery = query(
+        collection(db, "chats"),
+        where("participants", "array-contains", uid)
+      );
+      const chatSnap = await getDocs(chatQuery);
+      for (const chatDoc of chatSnap.docs) {
+        const chatRef = doc(db, "chats", chatDoc.id);
+        const messagesSnap = await getDocs(collection(chatRef, "messages"));
+        messagesSnap.docs.forEach((messageDoc) => batch.delete(messageDoc.ref));
+        batch.delete(chatRef);
+      }
+
+      // Clean up calls where this user is caller or callee.
+      const callIds = new Set<string>();
+      const callerQuery = query(collection(db, "calls"), where("callerId", "==", uid));
+      const calleeQuery = query(collection(db, "calls"), where("calleeId", "==", uid));
+
+      const [callerSnap, calleeSnap] = await Promise.all([
+        getDocs(callerQuery),
+        getDocs(calleeQuery),
+      ]);
+
+      const callDocs = [...callerSnap.docs, ...calleeSnap.docs];
+      for (const callDoc of callDocs) {
+        if (callIds.has(callDoc.id)) continue;
+        callIds.add(callDoc.id);
+
+        const callRef = doc(db, "calls", callDoc.id);
+        const callerCandidatesSnap = await getDocs(collection(callRef, "callerCandidates"));
+        callerCandidatesSnap.docs.forEach((candidateDoc) => batch.delete(candidateDoc.ref));
+
+        const calleeCandidatesSnap = await getDocs(collection(callRef, "calleeCandidates"));
+        calleeCandidatesSnap.docs.forEach((candidateDoc) => batch.delete(candidateDoc.ref));
+
+        batch.delete(callRef);
+      }
+
+      await batch.commit();
+
+      // Remove this user from other users' lists.
+      const userQueries = [
+        query(collection(db, "users"), where("friends", "array-contains", uid)),
+        query(collection(db, "users"), where("incomingRequests", "array-contains", uid)),
+        query(collection(db, "users"), where("outgoingRequests", "array-contains", uid)),
+        query(collection(db, "users"), where("blockedUsers", "array-contains", uid)),
+      ];
+
+      for (const userQuery of userQueries) {
+        const snap = await getDocs(userQuery);
+        for (const docSnap of snap.docs) {
+          await updateDoc(doc(db, "users", docSnap.id), {
+            friends: arrayRemove(uid),
+            incomingRequests: arrayRemove(uid),
+            outgoingRequests: arrayRemove(uid),
+            blockedUsers: arrayRemove(uid),
+          });
+        }
+      }
+
       await deleteUser(auth.currentUser);
-      await deleteDoc(doc(db, "users", uid));
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to delete account", error);
+      if (error.code === "auth/requires-recent-login") {
+        throw new Error("Please sign in again before deleting your account.");
+      }
       throw error;
     }
   };

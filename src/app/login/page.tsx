@@ -36,12 +36,12 @@ export default function LoginPage() {
   const setupReCAPTCHA = () => {
     if (!recaptchaContainer.current || (window as any).recaptchaVerifier) return;
     (window as any).recaptchaVerifier = new RecaptchaVerifier(
-      recaptchaContainer.current,
+      auth, // <--- auth থাকবে একদম প্রথমে
+      recaptchaContainer.current as unknown as HTMLElement, // <--- container থাকবে ২য় পজিশনে
       {
         size: "invisible",
-        callback: () => {},
-      },
-      auth
+        callback: () => { },
+      }
     );
   };
 
