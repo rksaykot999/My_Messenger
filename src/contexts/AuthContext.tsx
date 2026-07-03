@@ -25,6 +25,7 @@ import {
   doc,
   getDoc,
   getDocs,
+  onSnapshot,
   query,
   setDoc,
   updateDoc,
@@ -63,9 +64,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let unsubProfile: (() => void) | undefined;
+
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser);
+
+      // Stop listening to the previous user's profile document, if any.
+      unsubProfile?.();
+      unsubProfile = undefined;
+
       if (firebaseUser) {
+        // Paint something immediately from the auth record while the
+        // Firestore doc loads / in case Firestore is briefly unreachable.
         setProfile({
           uid: firebaseUser.uid,
           name: firebaseUser.displayName || "User",
@@ -75,8 +85,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             `https://picsum.photos/seed/${firebaseUser.uid}/200/200`,
           status: "Hey there! I'm using My Messenger.",
         });
+
+        const userRef = doc(db, "users", firebaseUser.uid);
         try {
-          const userRef = doc(db, "users", firebaseUser.uid);
           const existing = await getDoc(userRef);
           await setDoc(
             userRef,
@@ -106,9 +117,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             { merge: true }
           );
         } catch (e) {
-          // Firestore may be unreachable if Firebase isn't configured yet.
+          // Firestore may be unreachable, or its security rules haven't
+          // been deployed yet — don't block sign-in on this.
           console.warn("Could not sync user presence:", e);
         }
+
+        // Keep `profile` in sync with Firestore in real time, so that
+        // edits made from the Settings screen (name, status, photo) show
+        // up immediately everywhere in the app without a page reload.
+        unsubProfile = onSnapshot(
+          userRef,
+          (snap) => {
+            const data = snap.data() as any;
+            if (!data) return;
+            setProfile({
+              uid: firebaseUser.uid,
+              name: data.name || firebaseUser.displayName || "User",
+              email: data.email || firebaseUser.email || "",
+              photoURL:
+                data.photoURL ||
+                firebaseUser.photoURL ||
+                `https://picsum.photos/seed/${firebaseUser.uid}/200/200`,
+              status: data.status || "Hey there! I'm using My Messenger.",
+            });
+          },
+          (e) => {
+            console.warn("Could not subscribe to profile updates:", e);
+          }
+        );
       } else {
         setProfile(null);
       }
@@ -127,6 +163,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => {
       unsub();
+      unsubProfile?.();
       window.removeEventListener("beforeunload", handleOffline);
     };
   }, []);

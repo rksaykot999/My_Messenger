@@ -34,16 +34,28 @@ export default function LoginPage() {
   }, [user, loading, router]);
 
   const setupReCAPTCHA = () => {
-    if (!recaptchaContainer.current || (window as any).recaptchaVerifier) return;
-    (window as any).recaptchaVerifier = new RecaptchaVerifier(
-      auth, // <--- auth থাকবে একদম প্রথমে
-      recaptchaContainer.current as unknown as HTMLElement, // <--- container থাকবে ২য় পজিশনে
-      {
-        size: "invisible",
-        callback: () => { },
-      }
-    );
+    if (!recaptchaContainer.current) return (window as any).recaptchaVerifier;
+    if (!(window as any).recaptchaVerifier) {
+      (window as any).recaptchaVerifier = new RecaptchaVerifier(
+        auth,
+        recaptchaContainer.current as unknown as HTMLElement,
+        {
+          size: "invisible",
+          callback: () => {},
+        }
+      );
+    }
+    return (window as any).recaptchaVerifier;
   };
+
+  // Clean up the reCAPTCHA widget on unmount so a fresh one is created
+  // the next time this page is visited.
+  useEffect(() => {
+    return () => {
+      (window as any).recaptchaVerifier?.clear?.();
+      (window as any).recaptchaVerifier = undefined;
+    };
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,9 +64,12 @@ export default function LoginPage() {
     try {
       if (isPhoneLogin) {
         if (!phone.trim()) throw new Error("Enter a phone number first.");
-        setupReCAPTCHA();
-        const verifier = (window as any).recaptchaVerifier;
-        const confirmation = await signInWithPhoneNumber(auth, phone, verifier);
+        if (!phone.trim().startsWith("+")) {
+          throw { code: "auth/invalid-phone-number" };
+        }
+        const verifier = setupReCAPTCHA();
+        if (!verifier) throw new Error("Couldn't set up phone verification. Please refresh and try again.");
+        const confirmation = await signInWithPhoneNumber(auth, phone.trim(), verifier);
         setConfirmationResult(confirmation);
       } else {
         if (mode === "login") {
@@ -67,6 +82,12 @@ export default function LoginPage() {
       }
     } catch (err: any) {
       setError(friendlyAuthError(err?.code || err?.message));
+      if (isPhoneLogin) {
+        // The invisible reCAPTCHA challenge is single-use — throw it away
+        // so the next attempt gets a fresh one instead of silently failing.
+        (window as any).recaptchaVerifier?.clear?.();
+        (window as any).recaptchaVerifier = undefined;
+      }
     } finally {
       setSubmitting(false);
     }
@@ -265,6 +286,11 @@ export default function LoginPage() {
           </form>
         </Tabs>
       </div>
+
+      {/* Required, invisible container for the phone-auth reCAPTCHA widget.
+          Without this element in the DOM, RecaptchaVerifier can never be
+          created and phone sign-in/sign-up will silently fail. */}
+      <div ref={recaptchaContainer} id="recaptcha-container" />
     </div>
   );
 }
