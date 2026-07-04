@@ -19,6 +19,7 @@ import {
 } from "firebase/firestore";
 import { db, storage } from "@/lib/firebase";
 import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
+import { supabase } from "@/lib/supabase";
 
 export interface ChatMessage {
   id: string;
@@ -137,17 +138,29 @@ export async function uploadChatMedia(
   file: File,
   onProgress?: (percent: number) => void
 ): Promise<string> {
-  const path = `chatMedia/${chatId}/${Date.now()}_${file.name}`;
-  const storageRef = ref(storage, path);
-  const task = uploadBytesResumable(storageRef, file);
-  return new Promise((resolve, reject) => {
-    task.on(
-      "state_changed",
-      (snap) => onProgress?.(Math.round((snap.bytesTransferred / snap.totalBytes) * 100)),
-      (err) => reject(err),
-      async () => resolve(await getDownloadURL(task.snapshot.ref))
-    );
-  });
+  const fileExt = file.name.split('.').pop();
+  const fileName = `${chatId}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+  
+  onProgress?.(10);
+  
+  const { data, error } = await supabase.storage
+    .from('chat-media')
+    .upload(fileName, file, {
+      cacheControl: '3600',
+      upsert: false
+    });
+    
+  if (error) {
+    throw error;
+  }
+  
+  onProgress?.(100);
+  
+  const { data: { publicUrl } } = supabase.storage
+    .from('chat-media')
+    .getPublicUrl(fileName);
+    
+  return publicUrl;
 }
 
 /** Marks every message from the other participant as "read" (double blue check). */
