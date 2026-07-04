@@ -1,27 +1,11 @@
+# App build command for web and app: 
+npm run build && npx cap sync android
+
 # My Messenger
 
 A real-time messaging app (Next.js + Firebase) — login/signup, live chat,
 friend requests, voice/video calling, and browser notifications.
 
-## ⚠️ Critical step after downloading this update
-
-The code fixes below **will not take effect until you redeploy
-`firestore.rules`** (and `storage.rules`) to your Firebase project. Rules
-live on Firebase's servers, not in your app's bundle — editing the file in
-this repo does nothing by itself.
-
-**Firebase Console → Firestore Database → Rules tab** → paste the contents
-of `firestore.rules` → **Publish**.
-
-**Firebase Console → Storage → Rules tab** → paste the contents of
-`storage.rules` → **Publish**. (Storage rules are new in this update — Storage
-had no rules configured before, so profile-photo uploads were being silently
-rejected.)
-
-Or via CLI:
-```bash
-firebase deploy --only firestore:rules,storage:rules
-```
 
 ## Bugs found and fixed in this update
 

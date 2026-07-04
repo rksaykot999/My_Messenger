@@ -338,6 +338,20 @@ export function ChatView({ chat, onBack, onCall, isBlocked }: ChatViewProps) {
             </div>
           </div>
         ))}
+        
+        {/* Typing indicator bubble */}
+        {otherTyping && !blocked && (
+          <div className="flex flex-col max-w-[85%] items-start animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <div className="bg-muted text-foreground px-4 py-3 rounded-2xl rounded-tl-none flex items-center gap-1 shadow-sm h-10">
+              <div className="w-1.5 h-1.5 bg-muted-foreground/60 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+              <div className="w-1.5 h-1.5 bg-muted-foreground/60 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+              <div className="w-1.5 h-1.5 bg-muted-foreground/60 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+            </div>
+            <div className="flex items-center gap-1.5 mt-1 px-1">
+              <span className="text-[10px] text-accent font-medium">typing...</span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Input Area */}
