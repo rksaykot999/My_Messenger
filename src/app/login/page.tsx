@@ -10,10 +10,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MessageCircle, Loader2, Globe } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 export default function LoginPage() {
-  const { user, loading, login, signup, loginWithGoogle } = useAuth();
+  const { user, loading, login, signup, loginWithGoogle, sendPasswordReset } = useAuth();
   const router = useRouter();
+  const { toast } = useToast();
 
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [name, setName] = useState("");
@@ -99,6 +101,26 @@ export default function LoginPage() {
     try {
       await loginWithGoogle();
       router.replace("/");
+    } catch (err: any) {
+      setError(friendlyAuthError(err?.code || err?.message));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!email.trim()) {
+      setError("Please enter your email first to reset your password.");
+      return;
+    }
+    setError(null);
+    setSubmitting(true);
+    try {
+      await sendPasswordReset(email);
+      toast({
+        title: "Password Reset Email Sent",
+        description: "Check your inbox for instructions to reset your password.",
+      });
     } catch (err: any) {
       setError(friendlyAuthError(err?.code || err?.message));
     } finally {
@@ -217,7 +239,18 @@ export default function LoginPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="password">Password</Label>
+                    {mode === "login" && (
+                      <button
+                        type="button"
+                        onClick={handleForgotPassword}
+                        className="text-xs text-accent hover:underline"
+                      >
+                        Forgot password?
+                      </button>
+                    )}
+                  </div>
                   <Input
                     id="password"
                     type="password"

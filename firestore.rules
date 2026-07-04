@@ -116,7 +116,7 @@ service cloud.firestore {
 
         allow read: if isSignedIn() && request.auth.uid in chatParticipants();
         allow create: if isSignedIn()
-          && get(/databases/$(database)/documents/chats/$(chatId)).exists()
+          && exists(/databases/$(database)/documents/chats/$(chatId))
           && request.auth.uid in chatParticipants();
         // Recipients need to flip a message's status to "delivered"/"read"
         // (used for the double-checkmark receipts) without being able to
