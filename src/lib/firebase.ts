@@ -28,6 +28,8 @@ export const app = getApps().length
             apiKey: "AIzaSyCcpoTsFtl6OhJCtULG4b250JxlexU1owY",
             authDomain: "my-messenger-88ba1.firebaseapp.com",
             projectId: "my-messenger-88ba1",
+            storageBucket: "my-messenger-88ba1.firebasestorage.app",
+            messagingSenderId: "1038574226468",
             appId: "1:1038574226468:web:56065c221d5d9d48e31cb1",
           }
     );
