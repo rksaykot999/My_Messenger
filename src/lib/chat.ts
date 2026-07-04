@@ -17,7 +17,8 @@ import {
   arrayRemove,
   writeBatch,
 } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db, storage } from "@/lib/firebase";
+import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
 
 export interface ChatMessage {
   id: string;
@@ -25,6 +26,8 @@ export interface ChatMessage {
   senderId: string;
   createdAt: Timestamp | null;
   status: "sent" | "delivered" | "read";
+  type?: "text" | "image" | "video";
+  mediaURL?: string;
 }
 
 export interface ChatSummary {
@@ -34,6 +37,7 @@ export interface ChatSummary {
   lastMessageAt: Timestamp | null;
   lastSenderId?: string;
   unread?: Record<string, number>;
+  typing?: Record<string, Timestamp | null>;
 }
 
 export interface DirectoryUser {
@@ -100,22 +104,105 @@ export function subscribeMessages(
   });
 }
 
-export async function sendMessage(chatId: string, senderId: string, text: string) {
+export async function sendMessage(
+  chatId: string,
+  senderId: string,
+  text: string,
+  media?: { type: "image" | "video"; mediaURL: string }
+) {
   const chatRef = doc(db, "chats", chatId);
   await addDoc(collection(chatRef, "messages"), {
     text,
     senderId,
     createdAt: serverTimestamp(),
     status: "sent",
+    ...(media ? { type: media.type, mediaURL: media.mediaURL } : { type: "text" }),
   });
   const snap = await getDoc(chatRef);
   const data = snap.data() as any;
   const otherUid = (data?.participants || []).find((p: string) => p !== senderId);
+  const previewText = media ? (media.type === "image" ? "📷 Photo" : "🎥 Video") : text;
   await updateDoc(chatRef, {
-    lastMessage: text,
+    lastMessage: previewText,
     lastMessageAt: serverTimestamp(),
     lastSenderId: senderId,
+    [`typing.${senderId}`]: null,
     ...(otherUid ? { [`unread.${otherUid}`]: (data?.unread?.[otherUid] || 0) + 1 } : {}),
+  });
+}
+
+/** Uploads a photo/video attachment for a chat and returns its download URL. */
+export async function uploadChatMedia(
+  chatId: string,
+  file: File,
+  onProgress?: (percent: number) => void
+): Promise<string> {
+  const path = `chatMedia/${chatId}/${Date.now()}_${file.name}`;
+  const storageRef = ref(storage, path);
+  const task = uploadBytesResumable(storageRef, file);
+  return new Promise((resolve, reject) => {
+    task.on(
+      "state_changed",
+      (snap) => onProgress?.(Math.round((snap.bytesTransferred / snap.totalBytes) * 100)),
+      (err) => reject(err),
+      async () => resolve(await getDownloadURL(task.snapshot.ref))
+    );
+  });
+}
+
+/** Marks every message from the other participant as "read" (double blue check). */
+export async function markMessagesRead(chatId: string, myUid: string) {
+  try {
+    const msgsSnap = await getDocs(collection(db, "chats", chatId, "messages"));
+    const batch = writeBatch(db);
+    let any = false;
+    msgsSnap.docs.forEach((d) => {
+      const data = d.data() as any;
+      if (data.senderId !== myUid && data.status !== "read") {
+        batch.update(d.ref, { status: "read" });
+        any = true;
+      }
+    });
+    if (any) await batch.commit();
+  } catch {
+    // Best-effort — if rules/network hiccup, the sender just keeps seeing "sent".
+  }
+}
+
+/** Marks every message from the other participant as at least "delivered". */
+export async function markMessagesDelivered(chatId: string, myUid: string) {
+  try {
+    const msgsSnap = await getDocs(collection(db, "chats", chatId, "messages"));
+    const batch = writeBatch(db);
+    let any = false;
+    msgsSnap.docs.forEach((d) => {
+      const data = d.data() as any;
+      if (data.senderId !== myUid && data.status === "sent") {
+        batch.update(d.ref, { status: "delivered" });
+        any = true;
+      }
+    });
+    if (any) await batch.commit();
+  } catch {
+    // Best-effort.
+  }
+}
+
+/** Broadcasts (or clears) that I'm typing in this chat. */
+export async function setTypingStatus(chatId: string, uid: string, isTyping: boolean) {
+  try {
+    await updateDoc(doc(db, "chats", chatId), {
+      [`typing.${uid}`]: isTyping ? serverTimestamp() : null,
+    });
+  } catch {
+    // Chat doc may not exist yet — fine, nothing to broadcast to.
+  }
+}
+
+/** Subscribes to a single chat document (used to read the `typing` map live). */
+export function subscribeChatDoc(chatId: string, cb: (chat: ChatSummary | null) => void) {
+  return onSnapshot(doc(db, "chats", chatId), (snap) => {
+    cb(snap.exists() ? ({ id: snap.id, ...(snap.data() as any) } as ChatSummary) : null);
   });
 }
 

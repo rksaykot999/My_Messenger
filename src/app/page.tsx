@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { onSnapshot, doc, updateDoc } from "firebase/firestore";
 import { db, storage as firebaseStorage } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSettings, type ThemeMode } from "@/contexts/SettingsContext";
 import { BottomNav, TabType } from "@/components/messaging/BottomNav";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -14,9 +15,12 @@ import { Badge } from "@/components/ui/badge";
 import {
   Search, Phone, Video, Shield, Bell, Lock, Palette, TextQuote,
   Smartphone, Eye, ChevronLeft, LogOut, Plus, PhoneMissed, PhoneIncoming, PhoneOutgoing, Loader2,
+  Check, X, Download, KeyRound,
 } from "lucide-react";
 import { ChatView } from "@/components/messaging/ChatView";
 import { CallOverlay } from "@/components/messaging/CallOverlay";
+
+import { AppLockScreen, sha256 } from "@/components/messaging/AppLockScreen";
 import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -35,10 +39,12 @@ import { subscribeCallHistory, type CallDoc } from "@/lib/webrtc";
 import { useCallManager } from "@/hooks/use-call-manager";
 import { useMessageNotifications } from "@/hooks/use-message-notifications";
 import { updateProfile } from "firebase/auth";
-import { doc as fsDoc, deleteDoc } from "firebase/firestore";
+import { doc as fsDoc, deleteDoc, getDocs, collection } from "firebase/firestore";
 import { auth } from "@/lib/firebase";
 import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
 import { useToast } from "@/hooks/use-toast";
+
+const LANGUAGES = ['English (US)', 'Español', 'Français', 'Deutsch', '日本語', 'Português'];
 
 type SettingsView = 'main' | 'security' | 'theme' | 'language' | 'privacy';
 
@@ -59,7 +65,8 @@ function timeAgo(ts: any) {
 export default function MessengerApp() {
   const router = useRouter();
   const { toast } = useToast();
-  const { user, profile, loading, logout, deleteAccount, login, loginWithGoogle, finishDeleteAccount } = useAuth();
+  const { user, profile, loading, logout, deleteAccount, login, loginWithGoogle, finishDeleteAccount, sendPasswordReset } = useAuth();
+  const { settings, updateSettings } = useSettings();
 
   const [activeTab, setActiveTab] = useState<TabType>('chats');
   const [chats, setChats] = useState<ChatSummary[]>([]);
@@ -70,6 +77,10 @@ export default function MessengerApp() {
   const [outgoingRequests, setOutgoingRequests] = useState<string[]>([]);
   const [incomingRequests, setIncomingRequests] = useState<string[]>([]);
   const [selectedOtherUid, setSelectedOtherUid] = useState<string | null>(null);
+
+  const [chatSearchOpen, setChatSearchOpen] = useState(false);
+  const [chatSearchQuery, setChatSearchQuery] = useState('');
+  const [locked, setLocked] = useState(false);
 
   const [settingsView, setSettingsView] = useState<SettingsView>('main');
   const [isProfileEditing, setIsProfileEditing] = useState(false);
@@ -85,9 +96,23 @@ export default function MessengerApp() {
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [pinDialogOpen, setPinDialogOpen] = useState(false);
+  const [pinValue, setPinValue] = useState('');
+  const [isExportingData, setIsExportingData] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const callManager = useCallManager();
+
+  // App Lock: require the PIN once per app load if enabled.
+  useEffect(() => {
+    if (settings.appLockEnabled && settings.appLockPinHash) {
+      setLocked(true);
+    } else {
+      setLocked(false);
+    }
+    // Only re-evaluate when the lock is (de)activated, not on every settings change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings.appLockEnabled, settings.appLockPinHash]);
 
   // Redirect unauthenticated visitors to the login page.
   useEffect(() => {
@@ -172,6 +197,10 @@ export default function MessengerApp() {
 
   const filteredDirectory = directory.filter((d) =>
     d.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const visibleChatRows = chatRows.filter((c) =>
+    c.name.toLowerCase().includes(chatSearchQuery.toLowerCase())
   );
 
   const selectedPerson = selectedOtherUid ? directoryMap[selectedOtherUid] : null;
@@ -295,6 +324,79 @@ export default function MessengerApp() {
     }
   };
 
+  const handleChangePassword = async () => {
+    if (!profile?.email) {
+      toast({ title: "No email on file", description: "Password reset needs an email-based account." });
+      return;
+    }
+    try {
+      await sendPasswordReset(profile.email);
+      toast({ title: "Password reset email sent", description: `Check ${profile.email} for a reset link.` });
+    } catch (error: any) {
+      toast({ title: "Couldn't send reset email", description: error?.code ? `${error.code}: ${error.message}` : "Please try again." });
+    }
+  };
+
+  const handleDownloadMyData = async () => {
+    if (!user) return;
+    setIsExportingData(true);
+    try {
+      const chatsSnap = await getDocs(collection(db, "chats"));
+      const myChats = chatsSnap.docs
+        .map((d) => ({ id: d.id, ...(d.data() as any) }))
+        .filter((c: any) => (c.participants || []).includes(user.uid));
+
+      const chatsWithMessages = await Promise.all(
+        myChats.map(async (c: any) => {
+          const msgsSnap = await getDocs(collection(db, "chats", c.id, "messages"));
+          return {
+            ...c,
+            messages: msgsSnap.docs.map((m) => ({ id: m.id, ...(m.data() as any) })),
+          };
+        })
+      );
+
+      const exportPayload = {
+        exportedAt: new Date().toISOString(),
+        profile,
+        chats: chatsWithMessages,
+      };
+
+      const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `my-messenger-data-${user.uid}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast({ title: "Your data is downloading" });
+    } catch (error: any) {
+      console.error("Data export failed", error);
+      toast({ title: "Couldn't export your data", description: "Please try again." });
+    } finally {
+      setIsExportingData(false);
+    }
+  };
+
+  const handleSetAppLockPin = async () => {
+    if (pinValue.length < 4) {
+      toast({ title: "PIN too short", description: "Use at least 4 digits." });
+      return;
+    }
+    const hash = await sha256(pinValue);
+    updateSettings({ appLockEnabled: true, appLockPinHash: hash });
+    setPinDialogOpen(false);
+    setPinValue('');
+    toast({ title: "App Lock enabled" });
+  };
+
+  const handleDisableAppLock = () => {
+    updateSettings({ appLockEnabled: false, appLockPinHash: null });
+    toast({ title: "App Lock disabled" });
+  };
+
   if (loading || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -302,6 +404,12 @@ export default function MessengerApp() {
       </div>
     );
   }
+
+  if (locked && settings.appLockPinHash) {
+    return <AppLockScreen expectedHash={settings.appLockPinHash} onUnlock={() => setLocked(false)} />;
+  }
+
+
 
   // Incoming call ringing (takes priority over an in-progress call view).
   if (callManager.incomingCall && !callManager.activeCall) {
@@ -342,6 +450,8 @@ export default function MessengerApp() {
           name: selectedPerson.name,
           avatar: selectedPerson.photoURL,
           online: !!selectedPerson.online,
+          status: selectedPerson.status,
+          email: selectedPerson.email,
         }}
         isBlocked={blockedUsers.includes(selectedPerson.uid)}
         onBack={() => setSelectedOtherUid(null)}
@@ -369,11 +479,31 @@ export default function MessengerApp() {
             </h1>
           </div>
           <div className="flex gap-2">
-            <Button variant="ghost" size="icon" className="rounded-full bg-muted/50">
-              <Search className="h-5 w-5" />
-            </Button>
+            {activeTab === 'chats' && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => { setChatSearchOpen((v) => !v); if (chatSearchOpen) setChatSearchQuery(''); }}
+                className={cn("rounded-full bg-muted/50", chatSearchOpen && "text-accent")}
+              >
+                {chatSearchOpen ? <X className="h-5 w-5" /> : <Search className="h-5 w-5" />}
+              </Button>
+            )}
+
           </div>
         </div>
+        {activeTab === 'chats' && chatSearchOpen && (
+          <div className="relative animate-in fade-in slide-in-from-top-2 duration-200">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              autoFocus
+              value={chatSearchQuery}
+              onChange={(e) => setChatSearchQuery(e.target.value)}
+              placeholder="Search conversations..."
+              className="pl-10 rounded-full bg-muted/50 border-none h-10"
+            />
+          </div>
+        )}
       </header>
 
       {/* Tab Content */}
@@ -385,7 +515,12 @@ export default function MessengerApp() {
                 No conversations yet. Head to the People tab to say hello.
               </p>
             )}
-            {chatRows.map((chat) => (
+            {chatRows.length > 0 && visibleChatRows.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center mt-10">
+                No conversations match "{chatSearchQuery}".
+              </p>
+            )}
+            {visibleChatRows.map((chat) => (
               <button
                 key={chat.chatId}
                 onClick={async () => {
@@ -591,14 +726,20 @@ export default function MessengerApp() {
                           <div className="bg-blue-100 p-2 rounded-lg"><Bell className="h-4 w-4 text-blue-600" /></div>
                           <span className="text-sm font-medium">Message Notifications</span>
                         </div>
-                        <Switch defaultChecked />
+                        <Switch
+                          checked={settings.messageNotifications}
+                          onCheckedChange={(checked) => updateSettings({ messageNotifications: checked })}
+                        />
                       </div>
                       <div className="flex items-center justify-between p-4">
                         <div className="flex items-center gap-3">
                           <div className="bg-green-100 p-2 rounded-lg"><Phone className="h-4 w-4 text-green-600" /></div>
                           <span className="text-sm font-medium">Calls</span>
                         </div>
-                        <Switch defaultChecked />
+                        <Switch
+                          checked={settings.callNotifications}
+                          onCheckedChange={(checked) => updateSettings({ callNotifications: checked })}
+                        />
                       </div>
                     </div>
                   </section>
@@ -611,14 +752,20 @@ export default function MessengerApp() {
                           <div className="bg-orange-100 p-2 rounded-lg"><Eye className="h-4 w-4 text-orange-600" /></div>
                           <span className="text-sm font-medium">Read Receipts</span>
                         </div>
-                        <Switch defaultChecked />
+                        <Switch
+                          checked={settings.readReceipts}
+                          onCheckedChange={(checked) => updateSettings({ readReceipts: checked })}
+                        />
                       </div>
                       <div className="flex items-center justify-between p-4">
                         <div className="flex items-center gap-3">
                           <div className="bg-cyan-100 p-2 rounded-lg"><Smartphone className="h-4 w-4 text-cyan-600" /></div>
                           <span className="text-sm font-medium">Typing Indicator</span>
                         </div>
-                        <Switch defaultChecked />
+                        <Switch
+                          checked={settings.typingIndicator}
+                          onCheckedChange={(checked) => updateSettings({ typingIndicator: checked })}
+                        />
                       </div>
                     </div>
                   </section>
@@ -697,51 +844,95 @@ export default function MessengerApp() {
                     <div className="bg-card p-4 rounded-2xl border space-y-4">
                       <div className="flex items-center justify-between">
                         <div>
-                          <h5 className="text-sm font-semibold">Two-Factor Authentication</h5>
-                          <p className="text-xs text-muted-foreground">Add an extra layer of security</p>
+                          <h5 className="text-sm font-semibold">App Lock (PIN)</h5>
+                          <p className="text-xs text-muted-foreground">Require a PIN to open the app</p>
                         </div>
-                        <Switch />
+                        <Switch
+                          checked={settings.appLockEnabled}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setPinValue('');
+                              setPinDialogOpen(true);
+                            } else {
+                              handleDisableAppLock();
+                            }
+                          }}
+                        />
                       </div>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h5 className="text-sm font-semibold">Face ID / Touch ID</h5>
-                          <p className="text-xs text-muted-foreground">Quick access to your chats</p>
-                        </div>
-                        <Switch defaultChecked />
-                      </div>
+                      {settings.appLockEnabled && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="rounded-xl"
+                          onClick={() => { setPinValue(''); setPinDialogOpen(true); }}
+                        >
+                          <KeyRound className="h-3.5 w-3.5 mr-2" /> Change PIN
+                        </Button>
+                      )}
                     </div>
-                    <Button variant="outline" className="w-full rounded-xl">Change Password</Button>
+                    <Button variant="outline" className="w-full rounded-xl" onClick={handleChangePassword}>
+                      Reset Password by Email
+                    </Button>
                   </div>
                 )}
 
                 {settingsView === 'theme' && (
                   <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
-                      <button className="flex flex-col items-center gap-3 p-4 rounded-2xl border-2 border-primary bg-background">
-                        <div className="h-16 w-full bg-slate-50 rounded-lg border" />
+                      <button
+                        onClick={() => updateSettings({ theme: 'light' })}
+                        className={cn(
+                          "flex flex-col items-center gap-3 p-4 rounded-2xl border-2 bg-background",
+                          settings.theme === 'light' ? "border-primary" : "border-border"
+                        )}
+                      >
+                        <div className="h-16 w-full bg-slate-50 rounded-lg border relative">
+                          {settings.theme === 'light' && <Check className="h-4 w-4 absolute top-1 right-1 text-primary" />}
+                        </div>
                         <span className="text-xs font-semibold">Light Mode</span>
                       </button>
-                      <button className="flex flex-col items-center gap-3 p-4 rounded-2xl border bg-slate-900">
-                        <div className="h-16 w-full bg-slate-800 rounded-lg" />
+                      <button
+                        onClick={() => updateSettings({ theme: 'dark' })}
+                        className={cn(
+                          "flex flex-col items-center gap-3 p-4 rounded-2xl border bg-slate-900",
+                          settings.theme === 'dark' ? "border-2 border-primary" : "border-border"
+                        )}
+                      >
+                        <div className="h-16 w-full bg-slate-800 rounded-lg relative">
+                          {settings.theme === 'dark' && <Check className="h-4 w-4 absolute top-1 right-1 text-white" />}
+                        </div>
                         <span className="text-xs font-semibold text-white">Dark Mode</span>
                       </button>
                     </div>
                     <div className="bg-card p-4 rounded-2xl border">
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium">Follow System Theme</span>
-                        <Switch defaultChecked />
+                        <Switch
+                          checked={settings.theme === 'system'}
+                          onCheckedChange={(checked) => updateSettings({ theme: checked ? 'system' : 'light' })}
+                        />
                       </div>
                     </div>
                   </div>
                 )}
 
                 {settingsView === 'language' && (
-                  <div className="bg-card rounded-2xl border overflow-hidden">
-                    {['English (US)', 'Español', 'Français', 'Deutsch', '日本語', 'Português'].map((lang, i) => (
-                      <button key={i} className="w-full flex items-center justify-between p-4 border-b last:border-0 hover:bg-muted/30">
-                        <span className="text-sm font-medium">{lang}</span>
-                      </button>
-                    ))}
+                  <div className="space-y-3">
+                    <p className="text-xs text-muted-foreground px-1">
+                      Choosing a language updates your preference. Full app translation is still in progress — the interface currently displays in English.
+                    </p>
+                    <div className="bg-card rounded-2xl border overflow-hidden">
+                      {LANGUAGES.map((lang, i) => (
+                        <button
+                          key={i}
+                          onClick={() => updateSettings({ language: lang })}
+                          className="w-full flex items-center justify-between p-4 border-b last:border-0 hover:bg-muted/30"
+                        >
+                          <span className="text-sm font-medium">{lang}</span>
+                          {settings.language === lang && <Check className="h-4 w-4 text-accent" />}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 )}
 
@@ -751,7 +942,19 @@ export default function MessengerApp() {
                       <p>At My Messenger, we value your privacy. Messages are stored securely in your Firebase project and only shared with the people you message.</p>
                       <p className="mt-2">We do not sell your data to third parties.</p>
                     </div>
-                    <Button variant="outline" className="w-full rounded-xl">Download My Data</Button>
+                    <Button
+                      variant="outline"
+                      className="w-full rounded-xl"
+                      onClick={handleDownloadMyData}
+                      disabled={isExportingData}
+                    >
+                      {isExportingData ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Download className="h-4 w-4 mr-2" />
+                      )}
+                      Download My Data
+                    </Button>
                   </div>
                 )}
               </div>
@@ -760,7 +963,33 @@ export default function MessengerApp() {
         )}
       </main>
 
-      <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
+      <BottomNav activeTab={activeTab} onTabChange={setActiveTab} unreadCount={totalUnread} />
+
+      {/* App Lock PIN setup dialog */}
+      <Dialog open={pinDialogOpen} onOpenChange={setPinDialogOpen}>
+        <DialogContent className="max-w-xs rounded-3xl">
+          <DialogHeader>
+            <DialogTitle>Set App Lock PIN</DialogTitle>
+            <DialogDescription>You'll need this PIN to open My Messenger.</DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <Input
+              autoFocus
+              type="password"
+              inputMode="numeric"
+              maxLength={8}
+              value={pinValue}
+              onChange={(e) => setPinValue(e.target.value)}
+              placeholder="Enter a 4-8 digit PIN"
+              className="text-center tracking-[0.5em] rounded-xl h-12 bg-muted/50 border-none"
+            />
+          </div>
+          <DialogFooter className="flex-row gap-2">
+            <Button variant="ghost" onClick={() => setPinDialogOpen(false)} className="flex-1 rounded-xl">Cancel</Button>
+            <Button onClick={handleSetAppLockPin} className="flex-1 rounded-xl bg-accent hover:bg-accent/90">Save PIN</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Profile Dialog */}
       <Dialog open={isProfileEditing} onOpenChange={setIsProfileEditing}>

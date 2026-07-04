@@ -1,4 +1,4 @@
-'use server';
+'use client';
 /**
  * @fileOverview An AI chat assistant that can draft messages, summarize conversations, and answer questions.
  *

@@ -17,6 +17,7 @@ import {
   signOut,
   updateProfile,
   deleteUser,
+  sendPasswordResetEmail,
   User,
 } from "firebase/auth";
 import {
@@ -54,6 +55,7 @@ interface AuthContextValue {
   logout: () => Promise<void>;
   deleteAccount: () => Promise<void>;
   finishDeleteAccount: () => Promise<void>;
+  sendPasswordReset: (email: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -310,8 +312,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const sendPasswordReset = async (email: string) => {
+    if (!email.trim()) throw new Error("Enter your account email first.");
+    await sendPasswordResetEmail(auth, email.trim());
+  };
+
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signup, login, loginWithGoogle, logout, deleteAccount, finishDeleteAccount }}>
+    <AuthContext.Provider value={{ user, profile, loading, signup, login, loginWithGoogle, logout, deleteAccount, finishDeleteAccount, sendPasswordReset }}>
       {children}
     </AuthContext.Provider>
   );

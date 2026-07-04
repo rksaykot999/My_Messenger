@@ -88,19 +88,43 @@ service cloud.firestore {
         )
       );
       allow delete: if isSignedIn() && request.auth.uid == userId;
+
+      // Private, device-independent app preferences (theme, notification
+      // toggles, app-lock PIN hash, etc.) — never visible to other users.
+      match /private/{docId} {
+        allow read, write: if isSignedIn() && request.auth.uid == userId;
+      }
     }
 
     // A chat can only be read/written by its two participants.
     match /chats/{chatId} {
-      allow read, update, delete: if isSignedIn() && request.auth.uid in resource.data.participants;
+      // IMPORTANT: `get()` on a chat that hasn't been created yet (e.g. the
+      // very first message between two people) still evaluates this rule.
+      // When that happens `resource` is null, so `resource.data...` must
+      // never be dereferenced without checking for null first — otherwise
+      // the rule throws and Firestore reports it as permission-denied,
+      // silently blocking brand new conversations from ever being created.
+      allow get: if isSignedIn() && (resource == null || request.auth.uid in resource.data.participants);
+      allow list: if isSignedIn() && request.auth.uid in resource.data.participants;
+      allow update, delete: if isSignedIn() && request.auth.uid in resource.data.participants;
       allow create: if isSignedIn() && request.auth.uid in request.resource.data.participants;
 
       match /messages/{messageId} {
-        allow read: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
+        function chatParticipants() {
+          return get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
+        }
+
+        allow read: if isSignedIn() && request.auth.uid in chatParticipants();
         allow create: if isSignedIn()
           && get(/databases/$(database)/documents/chats/$(chatId)).exists()
-          && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
-        allow delete: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
+          && request.auth.uid in chatParticipants();
+        // Recipients need to flip a message's status to "delivered"/"read"
+        // (used for the double-checkmark receipts) without being able to
+        // rewrite its text/sender.
+        allow update: if isSignedIn()
+          && request.auth.uid in chatParticipants()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status"]);
+        allow delete: if isSignedIn() && request.auth.uid in chatParticipants();
       }
     }
 

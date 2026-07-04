@@ -6,9 +6,10 @@ export type TabType = 'chats' | 'discover' | 'calls' | 'settings';
 interface BottomNavProps {
   activeTab: TabType;
   onTabChange: (tab: TabType) => void;
+  unreadCount?: number;
 }
 
-export function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
+export function BottomNav({ activeTab, onTabChange, unreadCount = 0 }: BottomNavProps) {
   const tabs = [
     { id: 'chats', label: 'Chats', icon: MessageSquare },
     { id: 'discover', label: 'Discover', icon: Globe },
@@ -29,12 +30,17 @@ export function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
             )}
           >
             <div className="relative">
-              <Icon 
+              <Icon
                 className={cn(
-                  "h-5 w-5 transition-all duration-200", 
+                  "h-5 w-5 transition-all duration-200",
                   activeTab === id ? "scale-110 stroke-[2.5px]" : "stroke-[2px]"
-                )} 
+                )}
               />
+              {id === 'chats' && unreadCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 bg-accent text-white text-[9px] font-bold rounded-full flex items-center justify-center px-1 shadow-sm">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
             </div>
             <span className={cn(
               "text-[10px] font-semibold tracking-tight transition-colors duration-200",

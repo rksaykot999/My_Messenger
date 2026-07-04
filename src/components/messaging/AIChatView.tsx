@@ -42,7 +42,8 @@ export function AIChatView({ onBack }: { onBack: () => void }) {
       });
       setMessages(prev => [...prev, { role: 'model', content: result.response }]);
     } catch (error) {
-      setMessages(prev => [...prev, { role: 'model', content: "Sorry, I encountered an error. Please try again." }]);
+      console.error("AI assistant error", error);
+      setMessages(prev => [...prev, { role: 'model', content: "Sorry, I couldn't reach the AI assistant. Make sure GOOGLE_GENAI_API_KEY is set in your environment, then try again." }]);
     } finally {
       setIsLoading(false);
     }
