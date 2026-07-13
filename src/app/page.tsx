@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Search, Phone, Video, Shield, Bell, Lock, Palette, TextQuote,
   Smartphone, Eye, ChevronLeft, LogOut, Plus, PhoneMissed, PhoneIncoming, PhoneOutgoing, Loader2,
-  Check, X, Download, KeyRound,
+  Check, X, Download, KeyRound, MessageSquare, Users,
 } from "lucide-react";
 import { ChatView } from "@/components/messaging/ChatView";
 import { CallOverlay } from "@/components/messaging/CallOverlay";
@@ -43,8 +43,15 @@ import { doc as fsDoc, deleteDoc, getDocs, collection } from "firebase/firestore
 import { auth } from "@/lib/firebase";
 import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const LANGUAGES = ['English (US)', 'Español', 'Français', 'Deutsch', '日本語', 'Português'];
+const DESKTOP_NAV_ITEMS = [
+  { id: 'chats' as const, label: 'Chats', icon: MessageSquare },
+  { id: 'discover' as const, label: 'People', icon: Users },
+  { id: 'calls' as const, label: 'Calls', icon: Phone },
+  { id: 'settings' as const, label: 'Settings', icon: Shield },
+];
 
 type SettingsView = 'main' | 'security' | 'theme' | 'language' | 'privacy';
 
@@ -67,6 +74,7 @@ export default function MessengerApp() {
   const { toast } = useToast();
   const { user, profile, loading, logout, deleteAccount, login, loginWithGoogle, finishDeleteAccount, sendPasswordReset } = useAuth();
   const { settings, updateSettings } = useSettings();
+  const isMobile = useIsMobile();
 
   const [activeTab, setActiveTab] = useState<TabType>('chats');
   const [chats, setChats] = useState<ChatSummary[]>([]);
@@ -80,6 +88,7 @@ export default function MessengerApp() {
 
   const [chatSearchOpen, setChatSearchOpen] = useState(false);
   const [chatSearchQuery, setChatSearchQuery] = useState('');
+  const [chatFilter, setChatFilter] = useState<'all' | 'unread' | 'online'>('all');
   const [locked, setLocked] = useState(false);
 
   const [settingsView, setSettingsView] = useState<SettingsView>('main');
@@ -199,11 +208,42 @@ export default function MessengerApp() {
     d.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const visibleChatRows = chatRows.filter((c) =>
-    c.name.toLowerCase().includes(chatSearchQuery.toLowerCase())
+  const pendingRequestPeople = useMemo(
+    () => directory.filter((person) => incomingRequests.includes(person.uid)),
+    [directory, incomingRequests]
   );
 
+  const onlineFriends = useMemo(
+    () => directory.filter((person) => myFriends.includes(person.uid) && person.online),
+    [directory, myFriends]
+  );
+
+  const visibleChatRows = chatRows.filter((c) => {
+    const matchesSearch =
+      c.name.toLowerCase().includes(chatSearchQuery.toLowerCase()) ||
+      c.lastMessage.toLowerCase().includes(chatSearchQuery.toLowerCase());
+    if (!matchesSearch) return false;
+    if (chatFilter === 'unread') return c.unread > 0;
+    if (chatFilter === 'online') return c.online;
+    return true;
+  });
+
   const selectedPerson = selectedOtherUid ? directoryMap[selectedOtherUid] : null;
+  const currentTitle =
+    activeTab === 'settings' && settingsView !== 'main'
+      ? settingsView.replace(/^\w/, (c) => c.toUpperCase())
+      : activeTab === 'discover'
+        ? 'People'
+        : activeTab;
+
+  const openConversation = async (otherUid: string, chatId?: string) => {
+    if (!user) return;
+    setSelectedOtherUid(otherUid);
+    setActiveTab('chats');
+    if (chatId) {
+      await markChatRead(chatId, user.uid);
+    }
+  };
 
   const handleSendFriendRequest = async (otherUid: string) => {
     if (!user) return;
@@ -229,8 +269,7 @@ export default function MessengerApp() {
     if (!user) return;
     try {
       await acceptFriendRequest(user.uid, otherUid);
-      setActiveTab('chats');
-      setSelectedOtherUid(otherUid);
+      await openConversation(otherUid, [user.uid, otherUid].sort().join('_'));
     } catch (error: any) {
       console.error(error);
       toast({ title: "Couldn't accept request", description: error?.message || "Please try again." });
@@ -442,7 +481,7 @@ export default function MessengerApp() {
     );
   }
 
-  if (selectedPerson) {
+  if (selectedPerson && isMobile) {
     return (
       <ChatView
         chat={{
@@ -464,244 +503,436 @@ export default function MessengerApp() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-20 flex flex-col max-w-md mx-auto relative border-x">
-      {/* Header */}
-      <header className="px-5 pt-8 pb-4 sticky top-0 bg-background/80 backdrop-blur-md z-10">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            {activeTab === 'settings' && settingsView !== 'main' && (
-              <Button variant="ghost" size="icon" onClick={() => setSettingsView('main')} className="rounded-full -ml-2">
-                <ChevronLeft className="h-5 w-5" />
-              </Button>
-            )}
-            <h1 className="text-2xl font-bold font-headline capitalize">
-              {activeTab === 'settings' && settingsView !== 'main' ? settingsView.replace(/^\w/, c => c.toUpperCase()) : activeTab === 'discover' ? 'People' : activeTab}
-            </h1>
+    <div className="min-h-screen lg:h-screen lg:overflow-hidden">
+      <div className="flex min-h-screen w-full lg:h-screen">
+        <aside className="app-grid-lines hidden lg:flex lg:h-screen lg:w-[104px] lg:flex-col lg:items-center lg:justify-between lg:border-r lg:border-border/60 lg:bg-background/70 lg:p-4">
+          <div className="flex flex-col items-center gap-4">
+            <div className="app-surface flex h-14 w-14 items-center justify-center rounded-[22px] text-lg font-bold text-primary">
+              M
+            </div>
+            <div className="flex flex-col gap-2">
+              {DESKTOP_NAV_ITEMS.map(({ id, label, icon: Icon }) => (
+                <button
+                  key={id}
+                  onClick={() => {
+                    setActiveTab(id);
+                    if (id !== 'settings') setSettingsView('main');
+                  }}
+                  className={cn(
+                    "flex h-14 w-14 items-center justify-center rounded-[20px] transition-all",
+                    activeTab === id
+                      ? "app-hero text-primary shadow-lg shadow-primary/10"
+                      : "app-surface-muted text-muted-foreground hover:text-foreground"
+                  )}
+                  title={label}
+                  aria-label={label}
+                >
+                  <Icon className="h-5 w-5" />
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="flex gap-2">
-            {activeTab === 'chats' && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => { setChatSearchOpen((v) => !v); if (chatSearchOpen) setChatSearchQuery(''); }}
-                className={cn("rounded-full bg-muted/50", chatSearchOpen && "text-accent")}
-              >
-                {chatSearchOpen ? <X className="h-5 w-5" /> : <Search className="h-5 w-5" />}
-              </Button>
-            )}
+          <div className="app-surface-muted flex w-full flex-col items-center gap-3 rounded-[24px] px-3 py-4">
+            <Avatar className="h-11 w-11 ring-2 ring-background shadow-md">
+              <AvatarImage src={profile?.photoURL} />
+              <AvatarFallback>{profile?.name?.[0]}</AvatarFallback>
+            </Avatar>
+            <div className="text-center">
+              <p className="max-w-[64px] truncate text-[11px] font-semibold">{profile?.name}</p>
+              <p className="text-[10px] text-muted-foreground">Available</p>
+            </div>
+          </div>
+        </aside>
 
-          </div>
-        </div>
-        {activeTab === 'chats' && chatSearchOpen && (
-          <div className="relative animate-in fade-in slide-in-from-top-2 duration-200">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              autoFocus
-              value={chatSearchQuery}
-              onChange={(e) => setChatSearchQuery(e.target.value)}
-              placeholder="Search conversations..."
-              className="pl-10 rounded-full bg-muted/50 border-none h-10"
-            />
-          </div>
-        )}
-      </header>
-
-      {/* Tab Content */}
-      <main className="flex-1 px-5 overflow-y-auto animate-in fade-in slide-in-from-bottom-2 duration-300">
-        {activeTab === 'chats' && (
-          <div className="space-y-1">
-            {chatRows.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center mt-10">
-                No conversations yet. Head to the People tab to say hello.
-              </p>
+        <div className="app-grid-lines flex min-h-screen flex-1 flex-col overflow-hidden bg-background/55 lg:h-screen lg:min-h-0 lg:flex-row">
+          <section
+            className={cn(
+              "flex min-h-0 flex-1 flex-col bg-background/78 backdrop-blur-xl",
+              activeTab === 'chats'
+                ? "lg:w-[430px] lg:flex-none lg:border-r lg:border-border/60 xl:w-[470px]"
+                : "lg:max-w-full"
             )}
-            {chatRows.length > 0 && visibleChatRows.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center mt-10">
-                No conversations match "{chatSearchQuery}".
-              </p>
-            )}
-            {visibleChatRows.map((chat) => (
-              <button
-                key={chat.chatId}
-                onClick={async () => {
-                  setSelectedOtherUid(chat.otherUid);
-                  await markChatRead(chat.chatId, user.uid);
-                }}
-                className="w-full flex items-center gap-4 py-3 border-b border-border/50 last:border-0 hover:bg-muted/30 transition-colors rounded-lg px-2"
-              >
-                <div className="relative">
-                  <Avatar className="h-14 w-14">
-                    <AvatarImage src={chat.avatar} />
-                    <AvatarFallback>{chat.name[0]}</AvatarFallback>
-                  </Avatar>
-                  {chat.online && <div className="absolute bottom-0.5 right-0.5 w-3.5 h-3.5 bg-green-500 border-2 border-background rounded-full" />}
-                </div>
-                <div className="flex-1 text-left min-w-0">
-                  <div className="flex justify-between items-center mb-1">
-                    <h3 className="font-semibold text-[15px] truncate font-headline">{chat.name}</h3>
-                    <span className="text-[11px] text-muted-foreground">{chat.time}</span>
+          >
+            <header className="sticky top-0 z-10 border-b border-border/60 bg-background/68 px-5 pb-4 pt-8 backdrop-blur-xl lg:px-6 lg:pt-6">
+              <div className="mb-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  {activeTab === 'settings' && settingsView !== 'main' && (
+                    <Button variant="ghost" size="icon" onClick={() => setSettingsView('main')} className="rounded-full -ml-2">
+                      <ChevronLeft className="h-5 w-5" />
+                    </Button>
+                  )}
+                  <div>
+                    <p className="app-kicker">My Messenger</p>
+                    <h1 className="text-gradient-brand text-2xl font-bold font-headline capitalize">{currentTitle}</h1>
                   </div>
-                  <div className="flex justify-between items-center">
-                    <p className="text-sm text-muted-foreground truncate max-w-[180px]">{chat.lastMessage || 'Say hello 👋'}</p>
-                    {chat.unread > 0 && (
-                      <Badge className="bg-accent h-5 min-w-5 flex items-center justify-center p-0 rounded-full text-[10px]">{chat.unread}</Badge>
+                </div>
+                <div className="flex gap-2">
+                  {activeTab === 'chats' && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        setChatSearchOpen((v) => !v);
+                        if (chatSearchOpen) {
+                          setChatSearchQuery('');
+                          setChatFilter('all');
+                        }
+                      }}
+                      className={cn("app-surface-muted rounded-full", chatSearchOpen && "text-accent")}
+                    >
+                      {chatSearchOpen ? <X className="h-5 w-5" /> : <Search className="h-5 w-5" />}
+                    </Button>
+                  )}
+                </div>
+              </div>
+              {activeTab === 'chats' && (
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="app-surface rounded-[24px] p-3">
+                    <p className="text-[11px] text-muted-foreground">Unread</p>
+                    <p className="mt-2 text-xl font-bold font-headline">{totalUnread}</p>
+                  </div>
+                  <div className="app-surface rounded-[24px] p-3">
+                    <p className="text-[11px] text-muted-foreground">Online</p>
+                    <p className="mt-2 text-xl font-bold font-headline">{onlineFriends.length}</p>
+                  </div>
+                  <div className="app-surface rounded-[24px] p-3">
+                    <p className="text-[11px] text-muted-foreground">Requests</p>
+                    <p className="mt-2 text-xl font-bold font-headline">{pendingRequestPeople.length}</p>
+                  </div>
+                </div>
+              )}
+              {activeTab === 'chats' && chatSearchOpen && (
+                <div className="mt-4 space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      autoFocus
+                      value={chatSearchQuery}
+                      onChange={(e) => setChatSearchQuery(e.target.value)}
+                      placeholder="Search conversations..."
+                      className="app-surface-muted h-11 rounded-full border-none pl-10"
+                    />
+                  </div>
+                  <div className="flex gap-2 overflow-x-auto pb-1">
+                    {[
+                      { id: 'all', label: 'All' },
+                      { id: 'unread', label: 'Unread' },
+                      { id: 'online', label: 'Online' },
+                    ].map((filter) => (
+                      <button
+                        key={filter.id}
+                        onClick={() => setChatFilter(filter.id as 'all' | 'unread' | 'online')}
+                        className={cn(
+                          "rounded-full px-4 py-2 text-xs font-semibold transition-colors",
+                          chatFilter === filter.id
+                            ? "app-hero text-primary"
+                            : "app-surface-muted text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        {filter.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </header>
+
+            <main className="flex-1 overflow-y-auto px-5 pb-24 pt-5 animate-in fade-in slide-in-from-bottom-2 duration-300 lg:px-6 lg:pb-6">
+              {activeTab === 'chats' && (
+                <div className="space-y-4">
+                  {pendingRequestPeople.length > 0 && !chatSearchOpen && (
+                    <div className="app-hero rounded-[30px] p-4">
+                      <div className="mb-3 flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-semibold">Friend requests</p>
+                          <p className="text-xs text-muted-foreground">
+                            {pendingRequestPeople.length} waiting for your reply
+                          </p>
+                        </div>
+                        <Badge className="rounded-full bg-accent px-2.5 py-1 text-[10px]">
+                          New
+                        </Badge>
+                      </div>
+                      <div className="space-y-2">
+                        {pendingRequestPeople.slice(0, 2).map((person) => (
+                          <div
+                            key={person.uid}
+                            className="app-surface flex items-center justify-between rounded-[22px] p-3"
+                          >
+                            <div className="flex min-w-0 items-center gap-3">
+                              <Avatar className="h-10 w-10">
+                                <AvatarImage src={person.photoURL} />
+                                <AvatarFallback>{person.name[0]}</AvatarFallback>
+                              </Avatar>
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-semibold">{person.name}</p>
+                                <p className="truncate text-xs text-muted-foreground">
+                                  {person.status || 'Wants to connect with you'}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button size="sm" className="rounded-full" onClick={() => handleAcceptFriendRequest(person.uid)}>
+                                Accept
+                              </Button>
+                              <Button size="sm" variant="ghost" className="rounded-full" onClick={() => handleRejectFriendRequest(person.uid)}>
+                                Later
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    {chatRows.length === 0 && (
+                      <div className="app-surface-muted rounded-[30px] border-dashed p-8 text-center">
+                        <p className="text-base font-semibold">No conversations yet</p>
+                        <p className="mt-2 text-sm text-muted-foreground">
+                          Head to the People tab and start your first chat.
+                        </p>
+                      </div>
+                    )}
+                    {chatRows.length > 0 && visibleChatRows.length === 0 && (
+                      <div className="app-surface-muted rounded-[30px] border-dashed p-8 text-center">
+                        <p className="text-base font-semibold">Nothing matches your search</p>
+                        <p className="mt-2 text-sm text-muted-foreground">
+                          Try a different name, message preview, or filter.
+                        </p>
+                      </div>
+                    )}
+                    {visibleChatRows.map((chat) => (
+                      <button
+                        key={chat.chatId}
+                        onClick={() => openConversation(chat.otherUid, chat.chatId)}
+                        className={cn(
+                          "w-full px-4 py-4 text-left transition-all rounded-[30px]",
+                          selectedOtherUid === chat.otherUid
+                            ? "app-hero shadow-lg shadow-primary/10"
+                            : "app-surface hover:-translate-y-0.5 hover:shadow-xl hover:shadow-primary/10"
+                        )}
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="relative">
+                            <Avatar className="h-14 w-14 ring-2 ring-background shadow-sm">
+                              <AvatarImage src={chat.avatar} />
+                              <AvatarFallback>{chat.name[0]}</AvatarFallback>
+                            </Avatar>
+                            {chat.online && (
+                              <div className="absolute bottom-0.5 right-0.5 h-3.5 w-3.5 rounded-full border-2 border-background bg-green-500" />
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="mb-1 flex items-center justify-between gap-3">
+                              <h3 className="truncate text-[15px] font-semibold font-headline">{chat.name}</h3>
+                              <span className="shrink-0 text-[11px] text-muted-foreground">{chat.time}</span>
+                            </div>
+                            <div className="flex items-center justify-between gap-3">
+                              <p className="truncate text-sm text-muted-foreground">
+                                {chat.lastMessage || 'Say hello 👋'}
+                              </p>
+                              {chat.unread > 0 ? (
+                                <Badge className="h-5 min-w-5 rounded-full bg-accent p-0 text-[10px]">
+                                  {chat.unread}
+                                </Badge>
+                              ) : (
+                                <span className="text-[10px] font-medium text-muted-foreground">
+                                  {chat.online ? 'Online' : 'Seen recently'}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'discover' && (
+                <div className="space-y-8">
+                  <div className="space-y-4">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Find people..."
+                        className="app-surface-muted h-11 rounded-full border-none pl-10"
+                      />
+                    </div>
+
+                    {pendingRequestPeople.length > 0 && (
+                      <div className="app-hero rounded-[30px] p-4">
+                        <div className="mb-3 flex items-center justify-between">
+                          <div>
+                            <h3 className="app-section-label">
+                              Incoming Requests
+                            </h3>
+                            <p className="text-xs text-muted-foreground">
+                              Review who wants to connect with you
+                            </p>
+                          </div>
+                          <Badge variant="secondary">{pendingRequestPeople.length}</Badge>
+                        </div>
+                        <div className="space-y-2">
+                          {pendingRequestPeople.map((person) => (
+                            <div key={person.uid} className="app-surface flex items-center justify-between rounded-[22px] p-3">
+                              <div className="flex min-w-0 items-center gap-3">
+                                <Avatar className="h-11 w-11">
+                                  <AvatarImage src={person.photoURL} />
+                                  <AvatarFallback>{person.name[0]}</AvatarFallback>
+                                </Avatar>
+                                <div className="min-w-0">
+                                  <p className="truncate text-sm font-semibold">{person.name}</p>
+                                  <p className="truncate text-xs text-muted-foreground">{person.status || 'Available on My Messenger'}</p>
+                                </div>
+                              </div>
+                              <div className="flex gap-2">
+                                <Button size="sm" className="rounded-full" onClick={() => handleAcceptFriendRequest(person.uid)}>
+                                  Accept
+                                </Button>
+                                <Button size="sm" variant="ghost" className="rounded-full" onClick={() => handleRejectFriendRequest(person.uid)}>
+                                  Reject
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     )}
                   </div>
-                </div>
-              </button>
-            ))}
-          </div>
-        )}
 
-        {activeTab === 'discover' && (
-          <div className="space-y-8">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Find people..."
-                className="pl-10 rounded-full bg-muted/50 border-none h-11"
-              />
-            </div>
-
-            <div>
-              <h3 className="text-sm font-bold text-primary mb-4 uppercase tracking-wider">
-                People on My Messenger
-              </h3>
-              <div className="grid grid-cols-1 gap-4">
-                {filteredDirectory.length === 0 && (
-                  <p className="text-sm text-muted-foreground">
-                    No one else has signed up yet — invite a friend!
-                  </p>
-                )}
-                {filteredDirectory.map((person) => {
-                  const isFriend = myFriends.includes(person.uid);
-                  const hasOutgoing = outgoingRequests.includes(person.uid);
-                  const hasIncoming = incomingRequests.includes(person.uid);
-                  return (
-                    <div key={person.uid} className="rounded-3xl border border-border/70 bg-card p-4 flex items-center justify-between gap-4">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="relative">
-                          <Avatar className="h-12 w-12">
-                            <AvatarImage src={person.photoURL} />
-                            <AvatarFallback>{person.name[0]}</AvatarFallback>
-                          </Avatar>
-                          {person.online && <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-background rounded-full" />}
+                  <div>
+                    <h3 className="app-section-label mb-4">
+                      People on My Messenger
+                    </h3>
+                    <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                      {filteredDirectory.length === 0 && (
+                        <div className="app-surface-muted rounded-[30px] border-dashed p-8 text-sm text-muted-foreground">
+                          No one else has signed up yet. Invite a friend and build your network.
                         </div>
-                        <div className="min-w-0">
-                          <h4 className="text-sm font-semibold truncate">{person.name}</h4>
-                          <p className="text-xs text-muted-foreground truncate">
-                            {person.status || (person.online ? 'Online' : 'Offline')}
-                          </p>
-                          {isFriend && <p className="text-[10px] text-foreground/70 mt-1">Friend</p>}
-                          {hasOutgoing && <p className="text-[10px] text-muted-foreground mt-1">Friend request sent</p>}
-                          {hasIncoming && <p className="text-[10px] text-primary mt-1">Incoming request</p>}
-                        </div>
-                      </div>
-                      <div className="flex flex-col gap-2 shrink-0">
-                        {isFriend ? (
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => setSelectedOtherUid(person.uid)}
-                          >
-                            Message
-                          </Button>
-                        ) : hasIncoming ? (
-                          <div className="flex gap-2">
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={() => handleAcceptFriendRequest(person.uid)}
-                            >
-                              Accept
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleRejectFriendRequest(person.uid)}
-                            >
-                              Reject
-                            </Button>
-                          </div>
-                        ) : hasOutgoing ? (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleCancelFriendRequest(person.uid)}
-                          >
-                            Cancel
-                          </Button>
-                        ) : (
-                          <Button
-                            variant="default"
-                            size="sm"
-                            onClick={() => handleSendFriendRequest(person.uid)}
-                          >
-                            Add Friend
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'calls' && (
-          <div className="space-y-1">
-            {callHistory.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center mt-10">No calls yet.</p>
-            )}
-            {callHistory.map((call) => {
-              const isOutgoing = call.callerId === user.uid;
-              const other = isOutgoing
-                ? { name: call.calleeName, avatar: call.calleeAvatar }
-                : { name: call.callerName, avatar: call.callerAvatar };
-              const missed = call.status === 'declined' || call.status === 'missed';
-              return (
-                <div key={call.id} className="flex items-center gap-4 py-3 group">
-                  <Avatar className="h-12 w-12">
-                    <AvatarImage src={other.avatar} />
-                    <AvatarFallback>{other.name?.[0]}</AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1">
-                    <h4 className={cn("font-semibold text-sm", missed && "text-destructive")}>
-                      {other.name}
-                    </h4>
-                    <div className="flex items-center gap-1.5">
-                      {isOutgoing ? (
-                        <PhoneOutgoing className="h-3 w-3 text-muted-foreground" />
-                      ) : missed ? (
-                        <PhoneMissed className="h-3 w-3 text-destructive" />
-                      ) : (
-                        <PhoneIncoming className="h-3 w-3 text-muted-foreground" />
                       )}
-                      <span className="text-[11px] text-muted-foreground capitalize">{call.type} call</span>
+                      {filteredDirectory.map((person) => {
+                        const isFriend = myFriends.includes(person.uid);
+                        const hasOutgoing = outgoingRequests.includes(person.uid);
+                        const hasIncoming = incomingRequests.includes(person.uid);
+                        return (
+                          <div key={person.uid} className="app-surface rounded-[30px] p-4">
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="flex min-w-0 items-center gap-3">
+                                <div className="relative">
+                                  <Avatar className="h-12 w-12">
+                                    <AvatarImage src={person.photoURL} />
+                                    <AvatarFallback>{person.name[0]}</AvatarFallback>
+                                  </Avatar>
+                                  {person.online && (
+                                    <div className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-background bg-green-500" />
+                                  )}
+                                </div>
+                                <div className="min-w-0">
+                                  <h4 className="truncate text-sm font-semibold">{person.name}</h4>
+                                  <p className="truncate text-xs text-muted-foreground">
+                                    {person.status || (person.online ? 'Online' : 'Offline')}
+                                  </p>
+                                  {isFriend && <p className="mt-1 text-[10px] text-foreground/70">Friend</p>}
+                                  {hasOutgoing && <p className="mt-1 text-[10px] text-muted-foreground">Friend request sent</p>}
+                                  {hasIncoming && <p className="mt-1 text-[10px] text-primary">Incoming request</p>}
+                                </div>
+                              </div>
+                              {person.online && (
+                                <Badge variant="secondary" className="rounded-full">Online</Badge>
+                              )}
+                            </div>
+                            <div className="mt-4 flex flex-wrap gap-2">
+                              {isFriend ? (
+                                <Button variant="secondary" size="sm" className="rounded-full" onClick={() => openConversation(person.uid)}>
+                                  Message
+                                </Button>
+                              ) : hasIncoming ? (
+                                <>
+                                  <Button size="sm" className="rounded-full" onClick={() => handleAcceptFriendRequest(person.uid)}>
+                                    Accept
+                                  </Button>
+                                  <Button variant="ghost" size="sm" className="rounded-full" onClick={() => handleRejectFriendRequest(person.uid)}>
+                                    Reject
+                                  </Button>
+                                </>
+                              ) : hasOutgoing ? (
+                                <Button variant="outline" size="sm" className="rounded-full" onClick={() => handleCancelFriendRequest(person.uid)}>
+                                  Cancel Request
+                                </Button>
+                              ) : (
+                                <Button variant="default" size="sm" className="rounded-full" onClick={() => handleSendFriendRequest(person.uid)}>
+                                  Add Friend
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => callManager.startCall({ id: isOutgoing ? call.calleeId : call.callerId, name: other.name, avatar: other.avatar }, call.type)}
-                    className="rounded-full text-primary hover:bg-primary/5"
-                  >
-                    {call.type === 'voice' ? <Phone className="h-5 w-5" /> : <Video className="h-5 w-5" />}
-                  </Button>
                 </div>
-              );
-            })}
-          </div>
-        )}
+              )}
 
-        {activeTab === 'settings' && (
-          <div className="space-y-6 animate-in fade-in duration-300">
+              {activeTab === 'calls' && (
+                <div className="space-y-3">
+                  {callHistory.length === 0 && (
+                    <div className="app-surface-muted rounded-[30px] border-dashed p-8 text-center">
+                      <p className="text-base font-semibold">No calls yet</p>
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        Voice and video history will appear here once you connect.
+                      </p>
+                    </div>
+                  )}
+                  {callHistory.map((call) => {
+                    const isOutgoing = call.callerId === user.uid;
+                    const other = isOutgoing
+                      ? { name: call.calleeName, avatar: call.calleeAvatar }
+                      : { name: call.callerName, avatar: call.callerAvatar };
+                    const missed = call.status === 'declined' || call.status === 'missed';
+                    return (
+                      <div key={call.id} className="app-surface flex items-center gap-4 rounded-[30px] p-4">
+                        <Avatar className="h-12 w-12">
+                          <AvatarImage src={other.avatar} />
+                          <AvatarFallback>{other.name?.[0]}</AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0 flex-1">
+                          <h4 className={cn("truncate font-semibold text-sm", missed && "text-destructive")}>
+                            {other.name}
+                          </h4>
+                          <div className="flex items-center gap-1.5">
+                            {isOutgoing ? (
+                              <PhoneOutgoing className="h-3 w-3 text-muted-foreground" />
+                            ) : missed ? (
+                              <PhoneMissed className="h-3 w-3 text-destructive" />
+                            ) : (
+                              <PhoneIncoming className="h-3 w-3 text-muted-foreground" />
+                            )}
+                            <span className="text-[11px] capitalize text-muted-foreground">{call.type} call</span>
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => callManager.startCall({ id: isOutgoing ? call.calleeId : call.callerId, name: other.name, avatar: other.avatar }, call.type)}
+                          className="rounded-full text-primary hover:bg-primary/5"
+                        >
+                          {call.type === 'voice' ? <Phone className="h-5 w-5" /> : <Video className="h-5 w-5" />}
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {activeTab === 'settings' && (
+                <div className="space-y-6 animate-in fade-in duration-300">
             {settingsView === 'main' ? (
               <>
-                <div className="bg-primary/5 p-6 rounded-3xl flex flex-col items-center text-center">
+                <div className="app-hero p-6 rounded-[32px] flex flex-col items-center text-center">
                   <Avatar className="h-24 w-24 mb-4 ring-4 ring-background shadow-xl">
                     <AvatarImage src={profile?.photoURL} />
                     <AvatarFallback>{profile?.name?.[0]}</AvatarFallback>
@@ -719,8 +950,8 @@ export default function MessengerApp() {
 
                 <div className="space-y-4">
                   <section>
-                    <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-3 ml-2">Notifications</h4>
-                    <div className="bg-card rounded-2xl border overflow-hidden">
+                    <h4 className="app-section-label mb-3 ml-2">Notifications</h4>
+                    <div className="app-surface rounded-[28px] overflow-hidden">
                       <div className="flex items-center justify-between p-4 border-b last:border-0">
                         <div className="flex items-center gap-3">
                           <div className="bg-blue-100 p-2 rounded-lg"><Bell className="h-4 w-4 text-blue-600" /></div>
@@ -745,8 +976,8 @@ export default function MessengerApp() {
                   </section>
 
                   <section>
-                    <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-3 ml-2">Privacy</h4>
-                    <div className="bg-card rounded-2xl border overflow-hidden">
+                    <h4 className="app-section-label mb-3 ml-2">Privacy</h4>
+                    <div className="app-surface rounded-[28px] overflow-hidden">
                       <div className="flex items-center justify-between p-4 border-b last:border-0">
                         <div className="flex items-center gap-3">
                           <div className="bg-orange-100 p-2 rounded-lg"><Eye className="h-4 w-4 text-orange-600" /></div>
@@ -771,8 +1002,8 @@ export default function MessengerApp() {
                   </section>
 
                   <section>
-                    <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-3 ml-2">General</h4>
-                    <div className="bg-card rounded-2xl border overflow-hidden">
+                    <h4 className="app-section-label mb-3 ml-2">General</h4>
+                    <div className="app-surface rounded-[28px] overflow-hidden">
                       {[
                         { id: 'security' as const, icon: Shield, label: 'Account Security' },
                         { id: 'theme' as const, icon: Palette, label: 'Theme & Appearance' },
@@ -841,7 +1072,7 @@ export default function MessengerApp() {
               <div className="space-y-6">
                 {settingsView === 'security' && (
                   <div className="space-y-4">
-                    <div className="bg-card p-4 rounded-2xl border space-y-4">
+                    <div className="app-surface p-4 rounded-[28px] space-y-4">
                       <div className="flex items-center justify-between">
                         <div>
                           <h5 className="text-sm font-semibold">App Lock (PIN)</h5>
@@ -882,7 +1113,7 @@ export default function MessengerApp() {
                       <button
                         onClick={() => updateSettings({ theme: 'light' })}
                         className={cn(
-                          "flex flex-col items-center gap-3 p-4 rounded-2xl border-2 bg-background",
+                          "app-surface flex flex-col items-center gap-3 p-4 rounded-[28px] border-2 bg-background",
                           settings.theme === 'light' ? "border-primary" : "border-border"
                         )}
                       >
@@ -894,7 +1125,7 @@ export default function MessengerApp() {
                       <button
                         onClick={() => updateSettings({ theme: 'dark' })}
                         className={cn(
-                          "flex flex-col items-center gap-3 p-4 rounded-2xl border bg-slate-900",
+                          "flex flex-col items-center gap-3 p-4 rounded-[28px] border bg-slate-900 shadow-xl shadow-primary/10",
                           settings.theme === 'dark' ? "border-2 border-primary" : "border-border"
                         )}
                       >
@@ -904,7 +1135,7 @@ export default function MessengerApp() {
                         <span className="text-xs font-semibold text-white">Dark Mode</span>
                       </button>
                     </div>
-                    <div className="bg-card p-4 rounded-2xl border">
+                    <div className="app-surface p-4 rounded-[28px]">
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium">Follow System Theme</span>
                         <Switch
@@ -921,7 +1152,7 @@ export default function MessengerApp() {
                     <p className="text-xs text-muted-foreground px-1">
                       Choosing a language updates your preference. Full app translation is still in progress — the interface currently displays in English.
                     </p>
-                    <div className="bg-card rounded-2xl border overflow-hidden">
+                    <div className="app-surface rounded-[28px] overflow-hidden">
                       {LANGUAGES.map((lang, i) => (
                         <button
                           key={i}
@@ -938,7 +1169,7 @@ export default function MessengerApp() {
 
                 {settingsView === 'privacy' && (
                   <div className="space-y-4">
-                    <div className="prose prose-sm text-muted-foreground bg-card p-4 rounded-2xl border">
+                    <div className="app-surface prose prose-sm text-muted-foreground p-4 rounded-[28px]">
                       <p>At My Messenger, we value your privacy. Messages are stored securely in your Firebase project and only shared with the people you message.</p>
                       <p className="mt-2">We do not sell your data to third parties.</p>
                     </div>
@@ -959,11 +1190,52 @@ export default function MessengerApp() {
                 )}
               </div>
             )}
-          </div>
-        )}
-      </main>
+                </div>
+              )}
+            </main>
+          </section>
 
-      <BottomNav activeTab={activeTab} onTabChange={setActiveTab} unreadCount={totalUnread} />
+          {!isMobile && activeTab === 'chats' && (
+            <section className="app-grid-lines hidden min-h-0 flex-1 bg-background/35 lg:flex">
+              {selectedPerson ? (
+                <ChatView
+                  embedded
+                  chat={{
+                    id: selectedPerson.uid,
+                    name: selectedPerson.name,
+                    avatar: selectedPerson.photoURL,
+                    online: !!selectedPerson.online,
+                    status: selectedPerson.status,
+                    email: selectedPerson.email,
+                  }}
+                  isBlocked={blockedUsers.includes(selectedPerson.uid)}
+                  onBack={() => setSelectedOtherUid(null)}
+                  onCall={(type) => callManager.startCall(
+                    { id: selectedPerson.uid, name: selectedPerson.name, avatar: selectedPerson.photoURL },
+                    type
+                  )}
+                />
+              ) : (
+                <div className="flex flex-1 items-center justify-center p-10">
+                  <div className="app-hero max-w-md rounded-[36px] p-10 text-center">
+                    <div className="app-surface mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-[28px] text-primary">
+                      <MessageSquare className="h-9 w-9" />
+                    </div>
+                    <h2 className="text-gradient-brand text-2xl font-bold font-headline">Pick a conversation</h2>
+                    <p className="mt-3 text-sm text-muted-foreground">
+                      Your messages, media, typing indicators, and calls will show up here in a full desktop conversation view.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
+        </div>
+      </div>
+
+      <div className="lg:hidden">
+        <BottomNav activeTab={activeTab} onTabChange={setActiveTab} unreadCount={totalUnread} />
+      </div>
 
       {/* App Lock PIN setup dialog */}
       <Dialog open={pinDialogOpen} onOpenChange={setPinDialogOpen}>

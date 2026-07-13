@@ -97,13 +97,17 @@ export function CallOverlay({
         {hasRemoteVideo ? (
           <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
         ) : (
-          <Image
-            src={avatar}
-            alt="background"
-            fill
-            className="object-cover blur-2xl opacity-30 scale-125"
-            priority
-          />
+          <>
+            <Image
+              src={avatar}
+              alt="background"
+              fill
+              className="object-cover blur-2xl opacity-30 scale-125"
+              priority
+            />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,hsl(var(--accent)/0.35),transparent_55%),radial-gradient(circle_at_50%_100%,hsl(var(--primary)/0.45),transparent_60%)]" />
+            <div className="absolute inset-0 bg-slate-950/40" />
+          </>
         )}
       </div>
 
@@ -174,7 +178,7 @@ export function CallOverlay({
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-4 gap-4 w-full max-w-sm mb-10">
+          <div className="mb-10 grid w-full max-w-sm grid-cols-4 gap-3 rounded-[32px] border border-white/10 bg-white/5 p-4 backdrop-blur-xl">
             <Button
               variant="secondary"
               size="icon"

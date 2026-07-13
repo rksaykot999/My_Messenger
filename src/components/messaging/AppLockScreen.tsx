@@ -41,28 +41,30 @@ export function AppLockScreen({
   };
 
   return (
-    <div className="fixed inset-0 z-[200] bg-background flex flex-col items-center justify-center px-8">
-      <div className="h-16 w-16 rounded-2xl bg-accent/10 flex items-center justify-center mb-4">
-        <Lock className="h-8 w-8 text-accent" />
+    <div className="app-grid-lines fixed inset-0 z-[200] flex flex-col items-center justify-center bg-background px-8">
+      <div className="app-surface w-full max-w-xs rounded-[32px] p-8 text-center">
+        <div className="app-hero mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-[24px] text-accent">
+          <Lock className="h-8 w-8" />
+        </div>
+        <h1 className="text-gradient-brand mb-1 text-xl font-bold font-headline">App Locked</h1>
+        <p className="mb-6 text-sm text-muted-foreground">Enter your PIN to continue</p>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <Input
+            autoFocus
+            type="password"
+            inputMode="numeric"
+            maxLength={8}
+            value={pin}
+            onChange={(e) => setPin(e.target.value)}
+            placeholder="PIN"
+            className="h-12 rounded-2xl border border-border/50 bg-muted/40 text-center tracking-[0.5em]"
+          />
+          {error && <p className="text-center text-sm text-destructive">{error}</p>}
+          <Button type="submit" disabled={checking || pin.length === 0} className="h-11 w-full rounded-2xl bg-gradient-to-br from-accent to-primary shadow-lg shadow-accent/25 hover:opacity-90">
+            {checking ? <Loader2 className="h-4 w-4 animate-spin" /> : "Unlock"}
+          </Button>
+        </form>
       </div>
-      <h1 className="text-xl font-bold font-headline mb-1">App Locked</h1>
-      <p className="text-sm text-muted-foreground mb-6">Enter your PIN to continue</p>
-      <form onSubmit={handleSubmit} className="w-full max-w-xs space-y-3">
-        <Input
-          autoFocus
-          type="password"
-          inputMode="numeric"
-          maxLength={8}
-          value={pin}
-          onChange={(e) => setPin(e.target.value)}
-          placeholder="PIN"
-          className="text-center tracking-[0.5em] rounded-xl h-12 bg-muted/50 border-none"
-        />
-        {error && <p className="text-sm text-destructive text-center">{error}</p>}
-        <Button type="submit" disabled={checking || pin.length === 0} className="w-full h-11 rounded-xl bg-accent hover:bg-accent/90">
-          {checking ? <Loader2 className="h-4 w-4 animate-spin" /> : "Unlock"}
-        </Button>
-      </form>
     </div>
   );
 }

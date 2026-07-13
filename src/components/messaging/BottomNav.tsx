@@ -18,18 +18,21 @@ export function BottomNav({ activeTab, onTabChange, unreadCount = 0 }: BottomNav
   ] as const;
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-lg border-t border-border px-4 pb-safe pt-2 h-16 z-50">
-      <div className="max-w-md mx-auto flex justify-around items-center h-full">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 h-16 border-t border-border/60 bg-background/85 px-4 pb-safe pt-2 backdrop-blur-xl">
+      <div className="mx-auto flex h-full max-w-md items-center justify-around">
         {tabs.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
             onClick={() => onTabChange(id)}
             className={cn(
-              "relative flex flex-col items-center justify-center space-y-1 transition-all duration-200 flex-1 h-full outline-none",
+              "relative flex h-full flex-1 flex-col items-center justify-center gap-1 outline-none transition-all duration-200",
               activeTab === id ? "text-accent" : "text-muted-foreground hover:text-accent/70"
             )}
           >
-            <div className="relative">
+            <div className={cn(
+              "relative flex h-8 w-12 items-center justify-center rounded-full transition-all duration-200",
+              activeTab === id && "bg-accent/10"
+            )}>
               <Icon
                 className={cn(
                   "h-5 w-5 transition-all duration-200",
@@ -37,7 +40,7 @@ export function BottomNav({ activeTab, onTabChange, unreadCount = 0 }: BottomNav
                 )}
               />
               {id === 'chats' && unreadCount > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 bg-accent text-white text-[9px] font-bold rounded-full flex items-center justify-center px-1 shadow-sm">
+                <span className="absolute -top-1 -right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-gradient-to-br from-accent to-primary px-1 text-[9px] font-bold text-white shadow-sm">
                   {unreadCount > 99 ? '99+' : unreadCount}
                 </span>
               )}

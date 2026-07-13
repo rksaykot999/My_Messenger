@@ -50,13 +50,13 @@ export function AIChatView({ onBack }: { onBack: () => void }) {
   };
 
   return (
-    <div className="flex flex-col h-full bg-slate-50 relative z-50">
-      <header className="flex items-center gap-3 px-4 py-3 border-b bg-primary text-white sticky top-0">
-        <Button variant="ghost" size="icon" onClick={onBack} className="text-white hover:bg-white/10">
+    <div className="app-grid-lines relative z-50 flex h-full flex-col bg-background">
+      <header className="sticky top-0 flex items-center gap-3 border-b border-white/10 bg-gradient-to-r from-primary to-primary/80 px-4 py-3 text-white backdrop-blur-xl">
+        <Button variant="ghost" size="icon" onClick={onBack} className="rounded-full text-white hover:bg-white/10">
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div className="flex items-center gap-2">
-          <div className="h-8 w-8 rounded-full bg-accent flex items-center justify-center">
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15">
             <Sparkles className="h-4 w-4 text-white" />
           </div>
           <div>
@@ -66,7 +66,7 @@ export function AIChatView({ onBack }: { onBack: () => void }) {
         </div>
       </header>
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4 pb-20">
+      <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto p-4 pb-20">
         {messages.map((msg, i) => (
           <div key={i} className={cn("flex", msg.role === 'user' ? "justify-end" : "justify-start")}>
             <div className={cn(
@@ -74,16 +74,16 @@ export function AIChatView({ onBack }: { onBack: () => void }) {
               msg.role === 'user' ? "flex-row-reverse" : "flex-row"
             )}>
               <div className={cn(
-                "h-8 w-8 rounded-full flex items-center justify-center shrink-0",
-                msg.role === 'user' ? "bg-primary" : "bg-accent"
+                "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white",
+                msg.role === 'user' ? "bg-primary" : "bg-gradient-to-br from-accent to-primary"
               )}>
-                {msg.role === 'user' ? <User className="h-4 w-4 text-white" /> : <Bot className="h-4 w-4 text-white" />}
+                {msg.role === 'user' ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
               </div>
               <div className={cn(
-                "px-4 py-2 rounded-2xl text-sm leading-relaxed shadow-sm",
-                msg.role === 'user' 
-                  ? "bg-primary text-primary-foreground rounded-tr-none" 
-                  : "bg-white text-foreground rounded-tl-none border"
+                "rounded-[22px] px-4 py-2 text-sm leading-relaxed shadow-sm",
+                msg.role === 'user'
+                  ? "rounded-tr-md bg-gradient-to-br from-primary to-primary/80 text-primary-foreground"
+                  : "app-surface rounded-tl-md text-foreground"
               )}>
                 {msg.content}
               </div>
@@ -93,10 +93,10 @@ export function AIChatView({ onBack }: { onBack: () => void }) {
         {isLoading && (
           <div className="flex justify-start">
              <div className="flex max-w-[80%] gap-2">
-               <div className="h-8 w-8 rounded-full bg-accent flex items-center justify-center animate-pulse">
-                 <Bot className="h-4 w-4 text-white" />
+               <div className="flex h-8 w-8 animate-pulse items-center justify-center rounded-full bg-gradient-to-br from-accent to-primary text-white">
+                 <Bot className="h-4 w-4" />
                </div>
-               <div className="bg-white border px-4 py-2 rounded-2xl rounded-tl-none flex items-center gap-2 text-sm text-muted-foreground">
+               <div className="app-surface flex items-center gap-2 rounded-[22px] rounded-tl-md px-4 py-2 text-sm text-muted-foreground">
                  <Loader2 className="h-3 w-3 animate-spin" />
                  Thinking...
                </div>
@@ -105,16 +105,16 @@ export function AIChatView({ onBack }: { onBack: () => void }) {
         )}
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 p-3 bg-white border-t">
-        <div className="max-w-md mx-auto flex gap-2">
+      <div className="fixed bottom-0 left-0 right-0 border-t border-border/60 bg-background/85 p-3 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-md gap-2">
           <Input 
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleSend()}
             placeholder="Ask AI anything..."
-            className="rounded-full bg-slate-50"
+            className="rounded-full border border-border/50 bg-muted/40"
           />
-          <Button onClick={handleSend} size="icon" className="rounded-full bg-accent hover:bg-accent/90">
+          <Button onClick={handleSend} size="icon" className="rounded-full bg-gradient-to-br from-accent to-primary shadow-lg shadow-accent/25 hover:opacity-90">
             <Send className="h-4 w-4" />
           </Button>
         </div>

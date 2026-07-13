@@ -49,13 +49,14 @@ interface ChatViewProps {
   onBack: () => void;
   onCall: (type: 'voice' | 'video') => void;
   isBlocked?: boolean;
+  embedded?: boolean;
 }
 
 // A typing timestamp older than this is considered stale (the other user
 // probably closed the tab without clearing it).
 const TYPING_TTL_MS = 6000;
 
-export function ChatView({ chat, onBack, onCall, isBlocked }: ChatViewProps) {
+export function ChatView({ chat, onBack, onCall, isBlocked, embedded = false }: ChatViewProps) {
   const { user } = useAuth();
   const { settings } = useSettings();
   const { toast } = useToast();
@@ -251,41 +252,42 @@ export function ChatView({ chat, onBack, onCall, isBlocked }: ChatViewProps) {
   };
 
   return (
-    <div className="flex flex-col h-full bg-background relative">
-      {/* Header */}
-      <header className="flex items-center justify-between px-4 py-3 border-b bg-background/80 backdrop-blur-md sticky top-0 z-10">
+    <div className={cn("relative flex h-full min-h-0 flex-col bg-background", embedded && "w-full flex-1")}>
+      <header className="sticky top-0 z-10 flex items-center justify-between border-b border-border/60 bg-background/70 px-4 py-3 backdrop-blur-xl">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={onBack} className="-ml-2">
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div className="flex items-center gap-2">
+          {!embedded && (
+            <Button variant="ghost" size="icon" onClick={onBack} className="-ml-2 rounded-full">
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+          )}
+          <div className="flex items-center gap-3">
             <div className="relative">
-              <Avatar className="h-9 w-9">
+              <Avatar className="h-10 w-10 ring-2 ring-background shadow-md">
                 <AvatarImage src={chat.avatar} />
                 <AvatarFallback>{chat.name.substring(0, 2)}</AvatarFallback>
               </Avatar>
-              {chat.online && <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-background rounded-full" />}
+              {chat.online && <div className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-background bg-emerald-500" />}
             </div>
             <div>
               <h3 className="text-sm font-semibold leading-none font-headline">{chat.name}</h3>
-              <p className={cn("text-[10px] mt-1", otherTyping ? "text-accent font-medium" : "text-muted-foreground")}>
+              <p className={cn("mt-1.5 text-[11px]", otherTyping ? "font-medium text-accent" : "text-muted-foreground")}>
                 {blocked ? 'Blocked' : otherTyping ? 'typing…' : chat.online ? 'Online' : 'Last seen recently'}
               </p>
             </div>
           </div>
         </div>
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" onClick={() => onCall('voice')} className="text-primary">
+          <Button variant="ghost" size="icon" onClick={() => onCall('voice')} className="rounded-full text-primary hover:bg-primary/10">
             <Phone className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon" onClick={() => onCall('video')} className="text-primary">
+          <Button variant="ghost" size="icon" onClick={() => onCall('video')} className="rounded-full text-primary hover:bg-primary/10">
             <Video className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon" onClick={() => setInfoOpen(true)} className="text-primary">
+          <Button variant="ghost" size="icon" onClick={() => setInfoOpen(true)} className="rounded-full text-primary hover:bg-primary/10">
             <Info className="h-4 w-4" />
           </Button>
           {(isUploading) && (
-            <div className="flex items-center gap-1 text-[10px] text-muted-foreground pl-1">
+            <div className="flex items-center gap-1 pl-1 text-[10px] text-muted-foreground">
               <Loader2 className="h-3 w-3 animate-spin" /> {uploadProgress}%
             </div>
           )}
@@ -295,12 +297,19 @@ export function ChatView({ chat, onBack, onCall, isBlocked }: ChatViewProps) {
       {/* Messages */}
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto p-4 space-y-6 flex flex-col scroll-smooth pb-24"
+        className={cn(
+          "app-grid-lines flex flex-1 flex-col space-y-6 overflow-y-auto scroll-smooth p-4",
+          embedded ? "pb-32" : "pb-24"
+        )}
       >
         {messages.length === 0 && (
-          <p className="text-center text-xs text-muted-foreground mt-10">
-            Say hi to {chat.name.split(' ')[0]} 👋
-          </p>
+          <div className="m-auto flex flex-col items-center text-center">
+            <div className="app-surface mb-3 flex h-16 w-16 items-center justify-center rounded-[24px] text-2xl">
+              👋
+            </div>
+            <p className="text-sm font-medium text-foreground">Say hi to {chat.name.split(' ')[0]}</p>
+            <p className="mt-1 text-xs text-muted-foreground">This is the beginning of your conversation.</p>
+          </div>
         )}
         {messages.map((msg) => (
           <div
@@ -312,11 +321,11 @@ export function ChatView({ chat, onBack, onCall, isBlocked }: ChatViewProps) {
           >
             <div
               className={cn(
-                "text-sm leading-relaxed shadow-sm overflow-hidden",
-                msg.type === "image" || msg.type === "video" ? "rounded-2xl p-1" : "px-4 py-2.5 rounded-2xl",
+                "overflow-hidden text-sm leading-relaxed shadow-sm",
+                msg.type === "image" || msg.type === "video" ? "rounded-[22px] p-1" : "rounded-[22px] px-4 py-2.5",
                 msg.senderId === user?.uid
-                  ? "bg-primary text-primary-foreground rounded-tr-none"
-                  : "bg-muted text-foreground rounded-tl-none"
+                  ? "rounded-tr-md bg-gradient-to-br from-primary to-primary/80 text-primary-foreground shadow-primary/20"
+                  : "app-surface rounded-tl-md text-foreground"
               )}
             >
               {msg.type === "image" && msg.mediaURL ? (
@@ -342,7 +351,7 @@ export function ChatView({ chat, onBack, onCall, isBlocked }: ChatViewProps) {
         {/* Typing indicator bubble */}
         {otherTyping && !blocked && (
           <div className="flex flex-col max-w-[85%] items-start animate-in fade-in slide-in-from-bottom-2 duration-300">
-            <div className="bg-muted text-foreground px-4 py-3 rounded-2xl rounded-tl-none flex items-center gap-1 shadow-sm h-10">
+            <div className="app-surface flex h-10 items-center gap-1 rounded-[22px] rounded-tl-md px-4 py-3 text-foreground shadow-sm">
               <div className="w-1.5 h-1.5 bg-muted-foreground/60 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
               <div className="w-1.5 h-1.5 bg-muted-foreground/60 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
               <div className="w-1.5 h-1.5 bg-muted-foreground/60 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
@@ -355,15 +364,20 @@ export function ChatView({ chat, onBack, onCall, isBlocked }: ChatViewProps) {
       </div>
 
       {/* Input Area */}
-      <div className="fixed bottom-0 left-0 right-0 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] bg-background border-t z-20">
-        <div className="max-w-md mx-auto flex items-end gap-2">
+      <div
+        className={cn(
+          "left-0 right-0 z-20 border-t border-border/60 bg-background/85 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] backdrop-blur-xl",
+          embedded ? "absolute bottom-0" : "fixed bottom-0"
+        )}
+      >
+        <div className={cn("flex items-end gap-2", embedded ? "mx-0" : "max-w-md mx-auto")}>
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="secondary" size="icon" className="shrink-0 h-10 w-10 rounded-full" disabled={blocked || isUploading}>
+              <Button variant="secondary" size="icon" className="h-11 w-11 shrink-0 rounded-full app-surface-muted border-0" disabled={blocked || isUploading}>
                 {isUploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Plus className="h-5 w-5" />}
               </Button>
             </PopoverTrigger>
-            <PopoverContent side="top" align="start" className="w-56 p-2 rounded-xl border-none shadow-2xl bg-card">
+            <PopoverContent side="top" align="start" className="w-56 rounded-2xl border-none p-2 shadow-2xl app-surface">
               <div className="grid grid-cols-1 gap-1">
                 <Button variant="ghost" className="justify-start gap-3 h-10" onClick={() => imageInputRef.current?.click()}>
                   <ImageIcon className="h-4 w-4 text-blue-500" />
@@ -412,16 +426,18 @@ export function ChatView({ chat, onBack, onCall, isBlocked }: ChatViewProps) {
               onKeyDown={handleKeyPress}
               placeholder={blocked ? "You've blocked this user" : "Message..."}
               disabled={blocked}
-              className="pr-10 py-3 rounded-3xl min-h-[44px] bg-muted/50 border-none focus-visible:ring-1 focus-visible:ring-accent"
+              className="min-h-[46px] rounded-3xl border border-border/50 bg-muted/40 py-3 pr-10 focus-visible:ring-1 focus-visible:ring-accent"
             />
           </div>
 
           <Button
             onClick={handleSend}
-            disabled={!chatId || !inputText.trim() || blocked}
+            disabled={!inputText.trim() || blocked}
             className={cn(
-              "shrink-0 h-10 w-10 rounded-full p-0 transition-transform active:scale-95",
-              chatId && inputText.trim() && !blocked ? "bg-accent hover:bg-accent/90" : "bg-muted text-muted-foreground"
+              "h-11 w-11 shrink-0 rounded-full p-0 shadow-lg transition-transform active:scale-95",
+              inputText.trim() && !blocked
+                ? "bg-gradient-to-br from-accent to-primary shadow-accent/30 hover:opacity-90"
+                : "bg-muted text-muted-foreground shadow-none"
             )}
           >
             <Send className="h-5 w-5 ml-0.5" />

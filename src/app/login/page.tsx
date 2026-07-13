@@ -151,20 +151,20 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-background px-6 max-w-md mx-auto">
-      <div className="w-full">
+    <div className="app-grid-lines min-h-screen flex flex-col items-center justify-center bg-background px-6 py-10">
+      <div className="app-surface w-full max-w-md rounded-[36px] p-8 sm:p-10">
         <div className="flex flex-col items-center mb-8">
-          <div className="h-16 w-16 rounded-2xl bg-accent/10 flex items-center justify-center mb-4">
-            <MessageCircle className="h-8 w-8 text-accent" />
+          <div className="app-hero mb-4 flex h-16 w-16 items-center justify-center rounded-[24px] text-accent">
+            <MessageCircle className="h-8 w-8" />
           </div>
-          <h1 className="text-2xl font-bold font-headline">My Messenger</h1>
+          <h1 className="text-gradient-brand text-2xl font-bold font-headline">My Messenger</h1>
           <p className="text-sm text-muted-foreground mt-1">
             Real-time chat, calls, and more.
           </p>
         </div>
 
         <Tabs value={mode} onValueChange={(v) => setMode(v as "login" | "signup")}>
-          <TabsList className="grid grid-cols-2 w-full mb-6 rounded-xl">
+          <TabsList className="grid grid-cols-2 w-full mb-6 rounded-2xl app-surface-muted p-1">
             <TabsTrigger value="login" className="rounded-lg">Log In</TabsTrigger>
             <TabsTrigger value="signup" className="rounded-lg">Sign Up</TabsTrigger>
           </TabsList>
@@ -274,7 +274,7 @@ export default function LoginPage() {
             <Button
               type="submit"
               disabled={submitting}
-              className="w-full h-11 rounded-xl bg-accent hover:bg-accent/90"
+              className="w-full h-11 rounded-2xl bg-gradient-to-br from-accent to-primary shadow-lg shadow-accent/25 hover:opacity-90"
             >
               {submitting ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -289,7 +289,7 @@ export default function LoginPage() {
 
             <div className="relative py-4">
               <div className="absolute inset-x-0 top-1/2 border-t border-border/50" />
-              <p className="relative text-center text-xs text-muted-foreground bg-background px-3">
+              <p className="relative text-center text-xs text-muted-foreground bg-card px-3 w-fit mx-auto">
                 or continue with
               </p>
             </div>
@@ -299,7 +299,7 @@ export default function LoginPage() {
               variant="outline"
               disabled={submitting}
               onClick={handleGoogleSignIn}
-              className="w-full h-11 rounded-xl flex items-center justify-center gap-2"
+              className="w-full h-11 rounded-2xl flex items-center justify-center gap-2"
             >
               <Globe className="h-4 w-4" />
               Continue with Google
