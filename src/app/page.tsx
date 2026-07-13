@@ -491,6 +491,7 @@ export default function MessengerApp() {
           online: !!selectedPerson.online,
           status: selectedPerson.status,
           email: selectedPerson.email,
+          lastSeen: selectedPerson.lastSeen,
         }}
         isBlocked={blockedUsers.includes(selectedPerson.uid)}
         onBack={() => setSelectedOtherUid(null)}
@@ -1207,6 +1208,7 @@ export default function MessengerApp() {
                     online: !!selectedPerson.online,
                     status: selectedPerson.status,
                     email: selectedPerson.email,
+                    lastSeen: selectedPerson.lastSeen,
                   }}
                   isBlocked={blockedUsers.includes(selectedPerson.uid)}
                   onBack={() => setSelectedOtherUid(null)}

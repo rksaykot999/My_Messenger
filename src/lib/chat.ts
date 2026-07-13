@@ -16,6 +16,7 @@ import {
   arrayUnion,
   arrayRemove,
   writeBatch,
+  deleteField,
 } from "firebase/firestore";
 import { db, storage } from "@/lib/firebase";
 import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
@@ -29,6 +30,10 @@ export interface ChatMessage {
   status: "sent" | "delivered" | "read";
   type?: "text" | "image" | "video";
   mediaURL?: string;
+  reactions?: Record<string, string>;
+  replyTo?: { id: string; text: string; senderId: string } | null;
+  deleted?: boolean;
+  readAt?: Timestamp | null;
 }
 
 export interface ChatSummary {
@@ -48,6 +53,7 @@ export interface DirectoryUser {
   photoURL: string;
   status?: string;
   online?: boolean;
+  lastSeen?: Timestamp | null;
   friends?: string[];
   incomingRequests?: string[];
   outgoingRequests?: string[];
@@ -109,7 +115,8 @@ export async function sendMessage(
   chatId: string,
   senderId: string,
   text: string,
-  media?: { type: "image" | "video"; mediaURL: string }
+  media?: { type: "image" | "video"; mediaURL: string },
+  replyTo?: { id: string; text: string; senderId: string } | null
 ) {
   const chatRef = doc(db, "chats", chatId);
   await addDoc(collection(chatRef, "messages"), {
@@ -118,6 +125,7 @@ export async function sendMessage(
     createdAt: serverTimestamp(),
     status: "sent",
     ...(media ? { type: media.type, mediaURL: media.mediaURL } : { type: "text" }),
+    ...(replyTo ? { replyTo } : {}),
   });
   const snap = await getDoc(chatRef);
   const data = snap.data() as any;
@@ -172,7 +180,7 @@ export async function markMessagesRead(chatId: string, myUid: string) {
     msgsSnap.docs.forEach((d) => {
       const data = d.data() as any;
       if (data.senderId !== myUid && data.status !== "read") {
-        batch.update(d.ref, { status: "read" });
+        batch.update(d.ref, { status: "read", readAt: serverTimestamp() });
         any = true;
       }
     });
@@ -223,6 +231,33 @@ export async function markChatRead(chatId: string, uid: string) {
   try {
     await updateDoc(doc(db, "chats", chatId), { [`unread.${uid}`]: 0 });
   } catch {}
+}
+
+/** Toggles an emoji reaction from `uid` on a single message. */
+export async function toggleReaction(
+  chatId: string,
+  messageId: string,
+  uid: string,
+  emoji: string
+) {
+  const msgRef = doc(db, "chats", chatId, "messages", messageId);
+  const snap = await getDoc(msgRef);
+  const current = (snap.data() as any)?.reactions?.[uid];
+  await updateDoc(msgRef, {
+    [`reactions.${uid}`]: current === emoji ? deleteField() : emoji,
+  });
+}
+
+/** Deletes a message for everyone — keeps the doc but blanks its content. */
+export async function deleteMessageForEveryone(chatId: string, messageId: string) {
+  await updateDoc(doc(db, "chats", chatId, "messages", messageId), {
+    deleted: true,
+    text: "",
+    type: "text",
+    mediaURL: deleteField(),
+    reactions: deleteField(),
+    replyTo: deleteField(),
+  });
 }
 
 export async function deleteChatHistory(chatId: string) {
@@ -308,6 +343,7 @@ export function subscribeDirectory(
           photoURL: u.photoURL,
           status: u.status,
           online: u.online,
+          lastSeen: u.lastSeen ?? null,
           friends: u.friends || [],
           incomingRequests: u.incomingRequests || [],
           outgoingRequests: u.outgoingRequests || [],
@@ -319,4 +355,24 @@ export function subscribeDirectory(
 export async function getMyBlockedUsers(uid: string): Promise<string[]> {
   const snap = await getDoc(doc(db, "users", uid));
   return (snap.data() as any)?.blockedUsers || [];
+}
+
+/** Human-friendly "last seen" string from a Firestore timestamp. */
+export function formatLastSeen(lastSeen?: Timestamp | null): string {
+  const ms = lastSeen?.toMillis?.();
+  if (!ms) return "Last seen recently";
+  const diff = Date.now() - ms;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "Last seen just now";
+  if (mins < 60) return `Last seen ${mins} min ago`;
+  const date = new Date(ms);
+  const time = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const today = new Date();
+  const isToday = date.toDateString() === today.toDateString();
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  const isYesterday = date.toDateString() === yesterday.toDateString();
+  if (isToday) return `Last seen today at ${time}`;
+  if (isYesterday) return `Last seen yesterday at ${time}`;
+  return `Last seen ${date.toLocaleDateString([], { month: "short", day: "numeric" })} at ${time}`;
 }

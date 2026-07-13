@@ -163,10 +163,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
     window.addEventListener("beforeunload", handleOffline);
 
+    // Presence heartbeat: keep `lastSeen` fresh while the tab is open so
+    // other users see an accurate online status and "last seen" time.
+    const beat = () => {
+      if (!auth.currentUser) return;
+      const online = document.visibilityState === "visible";
+      updateDoc(doc(db, "users", auth.currentUser.uid), {
+        online,
+        lastSeen: serverTimestamp(),
+      }).catch(() => {});
+    };
+    const heartbeat = setInterval(beat, 25000);
+    const handleVisibility = () => beat();
+    document.addEventListener("visibilitychange", handleVisibility);
+
     return () => {
       unsub();
       unsubProfile?.();
+      clearInterval(heartbeat);
       window.removeEventListener("beforeunload", handleOffline);
+      document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, []);
 
