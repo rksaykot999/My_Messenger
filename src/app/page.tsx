@@ -838,7 +838,7 @@ export default function MessengerApp() {
                     </Button>
                   )}
                   <div>
-                    <p className="app-kicker">Professional Messaging</p>
+                    <p className="app-kicker">My Messenger</p>
                     <h1 className="text-gradient-brand text-2xl font-bold font-headline capitalize">{currentTitle}</h1>
                   </div>
                 </div>

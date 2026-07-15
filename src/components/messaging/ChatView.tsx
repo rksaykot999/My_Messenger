@@ -358,9 +358,53 @@ export function ChatView({ chat, onBack, onCall, isBlocked, embedded = false }: 
           <Button variant="ghost" size="icon" onClick={() => onCall('video')} className="rounded-full text-muted-foreground hover:bg-primary/10 hover:text-primary">
             <Video className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon" onClick={() => setInfoOpen(true)} className="rounded-full text-muted-foreground hover:bg-primary/10 hover:text-primary">
-            <Info className="h-4 w-4" />
-          </Button>
+          <Popover open={infoOpen} onOpenChange={setInfoOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="ghost" size="icon" className="rounded-full text-muted-foreground hover:bg-primary/10 hover:text-primary">
+                <Info className="h-4 w-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent side="bottom" align="end" sideOffset={12} className="w-[320px] rounded-[32px] border border-border/70 bg-background/95 backdrop-blur-2xl p-5 shadow-2xl relative">
+              <button onClick={() => setInfoOpen(false)} className="absolute right-4 top-4 rounded-full p-1 opacity-70 hover:opacity-100 hover:bg-muted transition-all">
+                <X className="h-4 w-4" />
+              </button>
+              <div className="mb-4 text-left px-1">
+                <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider">Conversation Options</h3>
+              </div>
+              <div className="flex flex-col items-center text-center py-2 mb-4">
+                <Avatar className="h-20 w-20 mb-3 ring-4 ring-background shadow-xl">
+                  <AvatarImage src={chat.avatar} />
+                  <AvatarFallback className="text-xl">{chat.name.substring(0, 2)}</AvatarFallback>
+                </Avatar>
+                <h4 className="text-lg font-bold font-headline">{chat.name}</h4>
+              </div>
+              <div className="space-y-1.5">
+                <button
+                  onClick={() => { setInfoOpen(false); setContactInfoOpen(true); }}
+                  className="w-full flex items-center gap-3 p-3.5 rounded-2xl border border-border/50 hover:bg-muted/50 text-left transition-colors"
+                >
+                  <div className="bg-muted p-2 rounded-xl"><UserRound className="h-4 w-4" /></div>
+                  <span className="text-sm font-semibold">View Contact Info</span>
+                </button>
+                <button
+                  onClick={() => { setInfoOpen(false); setConfirmDelete(true); }}
+                  className="w-full flex items-center gap-3 p-3.5 rounded-2xl hover:bg-destructive/10 text-left transition-colors group"
+                >
+                  <div className="bg-destructive/10 group-hover:bg-destructive/20 p-2 rounded-xl transition-colors"><Trash2 className="h-4 w-4 text-destructive" /></div>
+                  <span className="text-sm font-semibold text-destructive">Delete Chat History</span>
+                </button>
+                <button
+                  onClick={() => { setInfoOpen(false); setConfirmBlock(true); }}
+                  className="w-full flex items-center gap-3 p-3.5 rounded-2xl hover:bg-destructive/10 text-left transition-colors group"
+                >
+                  <div className="bg-destructive/10 group-hover:bg-destructive/20 p-2 rounded-xl transition-colors">
+                    {blocked ? <ShieldCheck className="h-4 w-4 text-destructive" /> : <ShieldOff className="h-4 w-4 text-destructive" />}
+                  </div>
+                  <span className="text-sm font-semibold text-destructive">{blocked ? 'Unblock User' : 'Block User'}</span>
+                </button>
+              </div>
+            </PopoverContent>
+          </Popover>
           {(isUploading) && (
             <div className="flex items-center gap-1 pl-1 text-[10px] text-muted-foreground">
               <Loader2 className="h-3 w-3 animate-spin" /> {uploadProgress}%
@@ -704,50 +748,11 @@ export function ChatView({ chat, onBack, onCall, isBlocked, embedded = false }: 
         </div>
       </div>
 
-      {/* Info / options sheet (replaces old "Chat with AI" button) */}
-      <Sheet open={infoOpen} onOpenChange={setInfoOpen}>
-        <SheetContent side="bottom" className="mx-auto max-w-md rounded-t-3xl border-border/70 bg-background/96">
-          <SheetHeader className="mb-2">
-            <SheetTitle className="text-left">Conversation Options</SheetTitle>
-          </SheetHeader>
-          <div className="flex flex-col items-center text-center py-2 mb-2">
-            <Avatar className="h-16 w-16 mb-2">
-              <AvatarImage src={chat.avatar} />
-              <AvatarFallback>{chat.name[0]}</AvatarFallback>
-            </Avatar>
-            <h4 className="font-semibold">{chat.name}</h4>
-          </div>
-          <div className="space-y-1">
-            <button
-              onClick={() => { setInfoOpen(false); setContactInfoOpen(true); }}
-              className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-muted/50 text-left"
-            >
-              <div className="bg-muted p-2 rounded-lg"><UserRound className="h-4 w-4" /></div>
-              <span className="text-sm font-medium">View Contact Info</span>
-            </button>
-            <button
-              onClick={() => setConfirmDelete(true)}
-              className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-muted/50 text-left"
-            >
-              <div className="bg-destructive/10 p-2 rounded-lg"><Trash2 className="h-4 w-4 text-destructive" /></div>
-              <span className="text-sm font-medium text-destructive">Delete Chat History</span>
-            </button>
-            <button
-              onClick={() => setConfirmBlock(true)}
-              className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-muted/50 text-left"
-            >
-              <div className="bg-destructive/10 p-2 rounded-lg">
-                {blocked ? <ShieldCheck className="h-4 w-4 text-destructive" /> : <ShieldOff className="h-4 w-4 text-destructive" />}
-              </div>
-              <span className="text-sm font-medium text-destructive">{blocked ? 'Unblock User' : 'Block User'}</span>
-            </button>
-          </div>
-        </SheetContent>
-      </Sheet>
+
 
       {/* Contact info sheet */}
       <Sheet open={contactInfoOpen} onOpenChange={setContactInfoOpen}>
-        <SheetContent side="right" className="w-full sm:max-w-md border-l border-border/70 bg-background/96 p-0 overflow-y-auto [&>button]:hidden">
+        <SheetContent side="right" className="w-full sm:max-w-md border-l border-border/70 bg-background/95 backdrop-blur-2xl p-0 overflow-y-auto [&>button]:hidden">
           <SheetHeader className="sr-only">
             <SheetTitle>Profile Details</SheetTitle>
           </SheetHeader>
