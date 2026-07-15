@@ -19,6 +19,9 @@ import {
 } from "lucide-react";
 import { ChatView } from "@/components/messaging/ChatView";
 import { CallOverlay } from "@/components/messaging/CallOverlay";
+import Image from "next/image";
+import AppLogo from "./app logo.svg";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 import { AppLockScreen, sha256 } from "@/components/messaging/AppLockScreen";
 import { cn } from "@/lib/utils";
@@ -50,7 +53,6 @@ const DESKTOP_NAV_ITEMS = [
   { id: 'chats' as const, label: 'Chats', icon: MessageSquare },
   { id: 'discover' as const, label: 'People', icon: Users },
   { id: 'calls' as const, label: 'Calls', icon: Phone },
-  { id: 'settings' as const, label: 'Settings', icon: Shield },
 ];
 
 type SettingsView = 'main' | 'security' | 'theme' | 'language' | 'privacy';
@@ -235,6 +237,21 @@ export default function MessengerApp() {
       : activeTab === 'discover'
         ? 'People'
         : activeTab;
+  const shouldShowChatSearch = !isMobile || chatSearchOpen;
+  const discoverOnlinePeople = useMemo(
+    () => filteredDirectory.filter((person) => person.online).slice(0, 8),
+    [filteredDirectory]
+  );
+  const discoverSuggestions = useMemo(
+    () =>
+      filteredDirectory.filter(
+        (person) =>
+          !myFriends.includes(person.uid) &&
+          !incomingRequests.includes(person.uid) &&
+          !outgoingRequests.includes(person.uid)
+      ),
+    [filteredDirectory, incomingRequests, myFriends, outgoingRequests]
+  );
 
   const openConversation = async (otherUid: string, chatId?: string) => {
     if (!user) return;
@@ -503,437 +520,11 @@ export default function MessengerApp() {
     );
   }
 
-  return (
-    <div className="min-h-screen lg:h-screen lg:overflow-hidden">
-      <div className="flex min-h-screen w-full lg:h-screen">
-        <aside className="app-grid-lines hidden lg:flex lg:h-screen lg:w-[104px] lg:flex-col lg:items-center lg:justify-between lg:border-r lg:border-border/60 lg:bg-background/70 lg:p-4">
-          <div className="flex flex-col items-center gap-4">
-            <div className="app-surface flex h-14 w-14 items-center justify-center rounded-[22px] text-lg font-bold text-primary">
-              M
-            </div>
-            <div className="flex flex-col gap-2">
-              {DESKTOP_NAV_ITEMS.map(({ id, label, icon: Icon }) => (
-                <button
-                  key={id}
-                  onClick={() => {
-                    setActiveTab(id);
-                    if (id !== 'settings') setSettingsView('main');
-                  }}
-                  className={cn(
-                    "flex h-14 w-14 items-center justify-center rounded-[20px] transition-all",
-                    activeTab === id
-                      ? "app-hero text-primary shadow-lg shadow-primary/10"
-                      : "app-surface-muted text-muted-foreground hover:text-foreground"
-                  )}
-                  title={label}
-                  aria-label={label}
-                >
-                  <Icon className="h-5 w-5" />
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="app-surface-muted flex w-full flex-col items-center gap-3 rounded-[24px] px-3 py-4">
-            <Avatar className="h-11 w-11 ring-2 ring-background shadow-md">
-              <AvatarImage src={profile?.photoURL} />
-              <AvatarFallback>{profile?.name?.[0]}</AvatarFallback>
-            </Avatar>
-            <div className="text-center">
-              <p className="max-w-[64px] truncate text-[11px] font-semibold">{profile?.name}</p>
-              <p className="text-[10px] text-muted-foreground">Available</p>
-            </div>
-          </div>
-        </aside>
-
-        <div className="app-grid-lines flex min-h-screen flex-1 flex-col overflow-hidden bg-background/55 lg:h-screen lg:min-h-0 lg:flex-row">
-          <section
-            className={cn(
-              "flex min-h-0 flex-1 flex-col bg-background/78 backdrop-blur-xl",
-              activeTab === 'chats'
-                ? "lg:w-[430px] lg:flex-none lg:border-r lg:border-border/60 xl:w-[470px]"
-                : "lg:max-w-full"
-            )}
-          >
-            <header className="sticky top-0 z-10 border-b border-border/60 bg-background/68 px-5 pb-4 pt-8 backdrop-blur-xl lg:px-6 lg:pt-6">
-              <div className="mb-4 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  {activeTab === 'settings' && settingsView !== 'main' && (
-                    <Button variant="ghost" size="icon" onClick={() => setSettingsView('main')} className="rounded-full -ml-2">
-                      <ChevronLeft className="h-5 w-5" />
-                    </Button>
-                  )}
-                  <div>
-                    <p className="app-kicker">My Messenger</p>
-                    <h1 className="text-gradient-brand text-2xl font-bold font-headline capitalize">{currentTitle}</h1>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  {activeTab === 'chats' && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => {
-                        setChatSearchOpen((v) => !v);
-                        if (chatSearchOpen) {
-                          setChatSearchQuery('');
-                          setChatFilter('all');
-                        }
-                      }}
-                      className={cn("app-surface-muted rounded-full", chatSearchOpen && "text-accent")}
-                    >
-                      {chatSearchOpen ? <X className="h-5 w-5" /> : <Search className="h-5 w-5" />}
-                    </Button>
-                  )}
-                </div>
-              </div>
-              {activeTab === 'chats' && (
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="app-surface rounded-[24px] p-3">
-                    <p className="text-[11px] text-muted-foreground">Unread</p>
-                    <p className="mt-2 text-xl font-bold font-headline">{totalUnread}</p>
-                  </div>
-                  <div className="app-surface rounded-[24px] p-3">
-                    <p className="text-[11px] text-muted-foreground">Online</p>
-                    <p className="mt-2 text-xl font-bold font-headline">{onlineFriends.length}</p>
-                  </div>
-                  <div className="app-surface rounded-[24px] p-3">
-                    <p className="text-[11px] text-muted-foreground">Requests</p>
-                    <p className="mt-2 text-xl font-bold font-headline">{pendingRequestPeople.length}</p>
-                  </div>
-                </div>
-              )}
-              {activeTab === 'chats' && chatSearchOpen && (
-                <div className="mt-4 space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      autoFocus
-                      value={chatSearchQuery}
-                      onChange={(e) => setChatSearchQuery(e.target.value)}
-                      placeholder="Search conversations..."
-                      className="app-surface-muted h-11 rounded-full border-none pl-10"
-                    />
-                  </div>
-                  <div className="flex gap-2 overflow-x-auto pb-1">
-                    {[
-                      { id: 'all', label: 'All' },
-                      { id: 'unread', label: 'Unread' },
-                      { id: 'online', label: 'Online' },
-                    ].map((filter) => (
-                      <button
-                        key={filter.id}
-                        onClick={() => setChatFilter(filter.id as 'all' | 'unread' | 'online')}
-                        className={cn(
-                          "rounded-full px-4 py-2 text-xs font-semibold transition-colors",
-                          chatFilter === filter.id
-                            ? "app-hero text-primary"
-                            : "app-surface-muted text-muted-foreground hover:text-foreground"
-                        )}
-                      >
-                        {filter.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </header>
-
-            <main className="flex-1 overflow-y-auto px-5 pb-24 pt-5 animate-in fade-in slide-in-from-bottom-2 duration-300 lg:px-6 lg:pb-6">
-              {activeTab === 'chats' && (
-                <div className="space-y-4">
-                  {pendingRequestPeople.length > 0 && !chatSearchOpen && (
-                    <div className="app-hero rounded-[30px] p-4">
-                      <div className="mb-3 flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-semibold">Friend requests</p>
-                          <p className="text-xs text-muted-foreground">
-                            {pendingRequestPeople.length} waiting for your reply
-                          </p>
-                        </div>
-                        <Badge className="rounded-full bg-accent px-2.5 py-1 text-[10px]">
-                          New
-                        </Badge>
-                      </div>
-                      <div className="space-y-2">
-                        {pendingRequestPeople.slice(0, 2).map((person) => (
-                          <div
-                            key={person.uid}
-                            className="app-surface flex items-center justify-between rounded-[22px] p-3"
-                          >
-                            <div className="flex min-w-0 items-center gap-3">
-                              <Avatar className="h-10 w-10">
-                                <AvatarImage src={person.photoURL} />
-                                <AvatarFallback>{person.name[0]}</AvatarFallback>
-                              </Avatar>
-                              <div className="min-w-0">
-                                <p className="truncate text-sm font-semibold">{person.name}</p>
-                                <p className="truncate text-xs text-muted-foreground">
-                                  {person.status || 'Wants to connect with you'}
-                                </p>
-                              </div>
-                            </div>
-                            <div className="flex gap-2">
-                              <Button size="sm" className="rounded-full" onClick={() => handleAcceptFriendRequest(person.uid)}>
-                                Accept
-                              </Button>
-                              <Button size="sm" variant="ghost" className="rounded-full" onClick={() => handleRejectFriendRequest(person.uid)}>
-                                Later
-                              </Button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="space-y-2">
-                    {chatRows.length === 0 && (
-                      <div className="app-surface-muted rounded-[30px] border-dashed p-8 text-center">
-                        <p className="text-base font-semibold">No conversations yet</p>
-                        <p className="mt-2 text-sm text-muted-foreground">
-                          Head to the People tab and start your first chat.
-                        </p>
-                      </div>
-                    )}
-                    {chatRows.length > 0 && visibleChatRows.length === 0 && (
-                      <div className="app-surface-muted rounded-[30px] border-dashed p-8 text-center">
-                        <p className="text-base font-semibold">Nothing matches your search</p>
-                        <p className="mt-2 text-sm text-muted-foreground">
-                          Try a different name, message preview, or filter.
-                        </p>
-                      </div>
-                    )}
-                    {visibleChatRows.map((chat) => (
-                      <button
-                        key={chat.chatId}
-                        onClick={() => openConversation(chat.otherUid, chat.chatId)}
-                        className={cn(
-                          "w-full px-4 py-4 text-left transition-all rounded-[30px]",
-                          selectedOtherUid === chat.otherUid
-                            ? "app-hero shadow-lg shadow-primary/10"
-                            : "app-surface hover:-translate-y-0.5 hover:shadow-xl hover:shadow-primary/10"
-                        )}
-                      >
-                        <div className="flex items-center gap-4">
-                          <div className="relative">
-                            <Avatar className="h-14 w-14 ring-2 ring-background shadow-sm">
-                              <AvatarImage src={chat.avatar} />
-                              <AvatarFallback>{chat.name[0]}</AvatarFallback>
-                            </Avatar>
-                            {chat.online && (
-                              <div className="absolute bottom-0.5 right-0.5 h-3.5 w-3.5 rounded-full border-2 border-background bg-green-500" />
-                            )}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="mb-1 flex items-center justify-between gap-3">
-                              <h3 className="truncate text-[15px] font-semibold font-headline">{chat.name}</h3>
-                              <span className="shrink-0 text-[11px] text-muted-foreground">{chat.time}</span>
-                            </div>
-                            <div className="flex items-center justify-between gap-3">
-                              <p className="truncate text-sm text-muted-foreground">
-                                {chat.lastMessage || 'Say hello 👋'}
-                              </p>
-                              {chat.unread > 0 ? (
-                                <Badge className="h-5 min-w-5 rounded-full bg-accent p-0 text-[10px]">
-                                  {chat.unread}
-                                </Badge>
-                              ) : (
-                                <span className="text-[10px] font-medium text-muted-foreground">
-                                  {chat.online ? 'Online' : 'Seen recently'}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {activeTab === 'discover' && (
-                <div className="space-y-8">
-                  <div className="space-y-4">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="Find people..."
-                        className="app-surface-muted h-11 rounded-full border-none pl-10"
-                      />
-                    </div>
-
-                    {pendingRequestPeople.length > 0 && (
-                      <div className="app-hero rounded-[30px] p-4">
-                        <div className="mb-3 flex items-center justify-between">
-                          <div>
-                            <h3 className="app-section-label">
-                              Incoming Requests
-                            </h3>
-                            <p className="text-xs text-muted-foreground">
-                              Review who wants to connect with you
-                            </p>
-                          </div>
-                          <Badge variant="secondary">{pendingRequestPeople.length}</Badge>
-                        </div>
-                        <div className="space-y-2">
-                          {pendingRequestPeople.map((person) => (
-                            <div key={person.uid} className="app-surface flex items-center justify-between rounded-[22px] p-3">
-                              <div className="flex min-w-0 items-center gap-3">
-                                <Avatar className="h-11 w-11">
-                                  <AvatarImage src={person.photoURL} />
-                                  <AvatarFallback>{person.name[0]}</AvatarFallback>
-                                </Avatar>
-                                <div className="min-w-0">
-                                  <p className="truncate text-sm font-semibold">{person.name}</p>
-                                  <p className="truncate text-xs text-muted-foreground">{person.status || 'Available on My Messenger'}</p>
-                                </div>
-                              </div>
-                              <div className="flex gap-2">
-                                <Button size="sm" className="rounded-full" onClick={() => handleAcceptFriendRequest(person.uid)}>
-                                  Accept
-                                </Button>
-                                <Button size="sm" variant="ghost" className="rounded-full" onClick={() => handleRejectFriendRequest(person.uid)}>
-                                  Reject
-                                </Button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  <div>
-                    <h3 className="app-section-label mb-4">
-                      People on My Messenger
-                    </h3>
-                    <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-                      {filteredDirectory.length === 0 && (
-                        <div className="app-surface-muted rounded-[30px] border-dashed p-8 text-sm text-muted-foreground">
-                          No one else has signed up yet. Invite a friend and build your network.
-                        </div>
-                      )}
-                      {filteredDirectory.map((person) => {
-                        const isFriend = myFriends.includes(person.uid);
-                        const hasOutgoing = outgoingRequests.includes(person.uid);
-                        const hasIncoming = incomingRequests.includes(person.uid);
-                        return (
-                          <div key={person.uid} className="app-surface rounded-[30px] p-4">
-                            <div className="flex items-start justify-between gap-4">
-                              <div className="flex min-w-0 items-center gap-3">
-                                <div className="relative">
-                                  <Avatar className="h-12 w-12">
-                                    <AvatarImage src={person.photoURL} />
-                                    <AvatarFallback>{person.name[0]}</AvatarFallback>
-                                  </Avatar>
-                                  {person.online && (
-                                    <div className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-background bg-green-500" />
-                                  )}
-                                </div>
-                                <div className="min-w-0">
-                                  <h4 className="truncate text-sm font-semibold">{person.name}</h4>
-                                  <p className="truncate text-xs text-muted-foreground">
-                                    {person.status || (person.online ? 'Online' : 'Offline')}
-                                  </p>
-                                  {isFriend && <p className="mt-1 text-[10px] text-foreground/70">Friend</p>}
-                                  {hasOutgoing && <p className="mt-1 text-[10px] text-muted-foreground">Friend request sent</p>}
-                                  {hasIncoming && <p className="mt-1 text-[10px] text-primary">Incoming request</p>}
-                                </div>
-                              </div>
-                              {person.online && (
-                                <Badge variant="secondary" className="rounded-full">Online</Badge>
-                              )}
-                            </div>
-                            <div className="mt-4 flex flex-wrap gap-2">
-                              {isFriend ? (
-                                <Button variant="secondary" size="sm" className="rounded-full" onClick={() => openConversation(person.uid)}>
-                                  Message
-                                </Button>
-                              ) : hasIncoming ? (
-                                <>
-                                  <Button size="sm" className="rounded-full" onClick={() => handleAcceptFriendRequest(person.uid)}>
-                                    Accept
-                                  </Button>
-                                  <Button variant="ghost" size="sm" className="rounded-full" onClick={() => handleRejectFriendRequest(person.uid)}>
-                                    Reject
-                                  </Button>
-                                </>
-                              ) : hasOutgoing ? (
-                                <Button variant="outline" size="sm" className="rounded-full" onClick={() => handleCancelFriendRequest(person.uid)}>
-                                  Cancel Request
-                                </Button>
-                              ) : (
-                                <Button variant="default" size="sm" className="rounded-full" onClick={() => handleSendFriendRequest(person.uid)}>
-                                  Add Friend
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {activeTab === 'calls' && (
-                <div className="space-y-3">
-                  {callHistory.length === 0 && (
-                    <div className="app-surface-muted rounded-[30px] border-dashed p-8 text-center">
-                      <p className="text-base font-semibold">No calls yet</p>
-                      <p className="mt-2 text-sm text-muted-foreground">
-                        Voice and video history will appear here once you connect.
-                      </p>
-                    </div>
-                  )}
-                  {callHistory.map((call) => {
-                    const isOutgoing = call.callerId === user.uid;
-                    const other = isOutgoing
-                      ? { name: call.calleeName, avatar: call.calleeAvatar }
-                      : { name: call.callerName, avatar: call.callerAvatar };
-                    const missed = call.status === 'declined' || call.status === 'missed';
-                    return (
-                      <div key={call.id} className="app-surface flex items-center gap-4 rounded-[30px] p-4">
-                        <Avatar className="h-12 w-12">
-                          <AvatarImage src={other.avatar} />
-                          <AvatarFallback>{other.name?.[0]}</AvatarFallback>
-                        </Avatar>
-                        <div className="min-w-0 flex-1">
-                          <h4 className={cn("truncate font-semibold text-sm", missed && "text-destructive")}>
-                            {other.name}
-                          </h4>
-                          <div className="flex items-center gap-1.5">
-                            {isOutgoing ? (
-                              <PhoneOutgoing className="h-3 w-3 text-muted-foreground" />
-                            ) : missed ? (
-                              <PhoneMissed className="h-3 w-3 text-destructive" />
-                            ) : (
-                              <PhoneIncoming className="h-3 w-3 text-muted-foreground" />
-                            )}
-                            <span className="text-[11px] capitalize text-muted-foreground">{call.type} call</span>
-                          </div>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => callManager.startCall({ id: isOutgoing ? call.calleeId : call.callerId, name: other.name, avatar: other.avatar }, call.type)}
-                          className="rounded-full text-primary hover:bg-primary/5"
-                        >
-                          {call.type === 'voice' ? <Phone className="h-5 w-5" /> : <Video className="h-5 w-5" />}
-                        </Button>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {activeTab === 'settings' && (
-                <div className="space-y-6 animate-in fade-in duration-300">
+  const renderSettingsContent = () => (
+    <div className="space-y-6 animate-in fade-in duration-300">
             {settingsView === 'main' ? (
               <>
-                <div className="app-hero p-6 rounded-[32px] flex flex-col items-center text-center">
+                <div className="app-hero flex flex-col items-center rounded-[32px] p-6 text-center">
                   <Avatar className="h-24 w-24 mb-4 ring-4 ring-background shadow-xl">
                     <AvatarImage src={profile?.photoURL} />
                     <AvatarFallback>{profile?.name?.[0]}</AvatarFallback>
@@ -976,31 +567,6 @@ export default function MessengerApp() {
                     </div>
                   </section>
 
-                  <section>
-                    <h4 className="app-section-label mb-3 ml-2">Privacy</h4>
-                    <div className="app-surface rounded-[28px] overflow-hidden">
-                      <div className="flex items-center justify-between p-4 border-b last:border-0">
-                        <div className="flex items-center gap-3">
-                          <div className="bg-orange-100 p-2 rounded-lg"><Eye className="h-4 w-4 text-orange-600" /></div>
-                          <span className="text-sm font-medium">Read Receipts</span>
-                        </div>
-                        <Switch
-                          checked={settings.readReceipts}
-                          onCheckedChange={(checked) => updateSettings({ readReceipts: checked })}
-                        />
-                      </div>
-                      <div className="flex items-center justify-between p-4">
-                        <div className="flex items-center gap-3">
-                          <div className="bg-cyan-100 p-2 rounded-lg"><Smartphone className="h-4 w-4 text-cyan-600" /></div>
-                          <span className="text-sm font-medium">Typing Indicator</span>
-                        </div>
-                        <Switch
-                          checked={settings.typingIndicator}
-                          onCheckedChange={(checked) => updateSettings({ typingIndicator: checked })}
-                        />
-                      </div>
-                    </div>
-                  </section>
 
                   <section>
                     <h4 className="app-section-label mb-3 ml-2">General</h4>
@@ -1191,13 +757,468 @@ export default function MessengerApp() {
                 )}
               </div>
             )}
+    </div>
+  );
+
+  return (
+    <div className="app-shell min-h-screen lg:h-screen lg:overflow-hidden">
+      <div className="flex min-h-screen w-full lg:h-screen">
+        <aside className="hidden lg:flex lg:h-screen lg:w-[92px] shrink-0 lg:flex-col lg:items-center lg:justify-between lg:px-3 lg:py-5">
+          <div className="flex w-full flex-col items-center gap-4">
+            <div className="app-sidebar flex w-full flex-col items-center gap-4 rounded-[32px] px-2 py-5">
+              <button onClick={() => window.location.reload()} className="flex h-14 w-14 items-center justify-center shrink-0 hover:scale-105 transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-xl">
+                <Image src={AppLogo} alt="App Logo" className="h-full w-full object-contain drop-shadow-md" priority />
+              </button>
+              <div className="flex w-full flex-col gap-3 mt-2">
+              {DESKTOP_NAV_ITEMS.map(({ id, label, icon: Icon }) => (
+                <button
+                  key={id}
+                  onClick={() => {
+                    setActiveTab(id);
+                    setSettingsView('main');
+                  }}
+                  className={cn(
+                    "flex w-full items-center justify-center rounded-[20px] p-3.5 transition-all",
+                    activeTab === id
+                      ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
+                      : "app-surface-muted app-card-hover text-muted-foreground hover:text-foreground"
+                  )}
+                  title={label}
+                  aria-label={label}
+                >
+                  <Icon className="h-6 w-6 shrink-0" />
+                </button>
+              ))}
+              </div>
+            </div>
+          </div>
+          <div className="app-sidebar flex w-full flex-col items-center gap-3 rounded-[28px] px-2 py-4">
+            <Popover>
+              <PopoverTrigger asChild>
+                <button className="outline-none rounded-full ring-offset-2 ring-offset-background focus-visible:ring-2 focus-visible:ring-primary hover:opacity-80 transition-opacity">
+                  <Avatar className="h-12 w-12 ring-2 ring-background/80 shadow-md shrink-0">
+                    <AvatarImage src={profile?.photoURL} />
+                    <AvatarFallback>{profile?.name?.[0]}</AvatarFallback>
+                  </Avatar>
+                </button>
+              </PopoverTrigger>
+              <PopoverContent side="right" align="end" sideOffset={20} className="w-[420px] max-h-[85vh] overflow-y-auto p-4 rounded-[34px] border border-border/70 bg-background/66 shadow-[0_24px_60px_rgba(0,0,0,0.25)] backdrop-blur-2xl z-50 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                <div className="mb-4 flex items-center justify-between px-2">
+                  <div>
+                    <h3 className="text-xl font-bold font-headline">Settings</h3>
+                    <p className="text-xs text-muted-foreground">Manage your account and preferences.</p>
+                  </div>
+                  {settingsView !== 'main' && (
+                    <Button variant="ghost" size="icon" onClick={() => setSettingsView('main')} className="rounded-full">
+                      <ChevronLeft className="h-5 w-5" />
+                    </Button>
+                  )}
+                </div>
+                {renderSettingsContent()}
+              </PopoverContent>
+            </Popover>
+          </div>
+        </aside>
+
+        <div className="app-grid-lines flex min-h-screen flex-1 flex-col overflow-hidden lg:h-screen lg:min-h-0 lg:flex-row lg:gap-4 lg:p-4 lg:pl-0">
+          <section
+            className={cn(
+              "flex min-h-0 flex-1 flex-col lg:rounded-[34px] lg:border lg:border-border/70 lg:bg-background/66 lg:shadow-[0_24px_60px_rgba(0,0,0,0.25)] lg:backdrop-blur-2xl",
+              activeTab === 'chats'
+                ? "lg:w-[350px] lg:shrink-0 lg:flex-none xl:w-[400px]"
+                : "lg:flex-1"
+            )}
+          >
+            <header className="app-toolbar sticky top-0 z-10 px-5 pb-4 pt-7 lg:rounded-t-[34px] lg:px-6 lg:pt-6">
+              <div className="mb-4 flex items-start justify-between gap-4">
+                <div className="flex items-start gap-2">
+                  {activeTab === 'settings' && settingsView !== 'main' && (
+                    <Button variant="ghost" size="icon" onClick={() => setSettingsView('main')} className="rounded-full -ml-2">
+                      <ChevronLeft className="h-5 w-5" />
+                    </Button>
+                  )}
+                  <div>
+                    <p className="app-kicker">Professional Messaging</p>
+                    <h1 className="text-gradient-brand text-2xl font-bold font-headline capitalize">{currentTitle}</h1>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  {activeTab === 'chats' && isMobile && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        setChatSearchOpen((v) => !v);
+                        if (chatSearchOpen) {
+                          setChatSearchQuery('');
+                          setChatFilter('all');
+                        }
+                      }}
+                      className={cn("app-surface-muted rounded-full", chatSearchOpen && "bg-primary/10 text-primary")}
+                    >
+                      {chatSearchOpen ? <X className="h-5 w-5" /> : <Search className="h-5 w-5" />}
+                    </Button>
+                  )}
+                </div>
+              </div>
+              {activeTab === 'chats' && shouldShowChatSearch && (
+                <div className="mt-4 space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      autoFocus
+                      value={chatSearchQuery}
+                      onChange={(e) => setChatSearchQuery(e.target.value)}
+                      placeholder="Search conversations..."
+                      className="app-input h-11 rounded-full border-none pl-10"
+                    />
+                  </div>
+                  <div className="flex gap-2 overflow-x-auto pb-1">
+                    {[
+                      { id: 'all', label: 'All' },
+                      { id: 'unread', label: 'Unread' },
+                      { id: 'online', label: 'Online' },
+                    ].map((filter) => (
+                      <button
+                        key={filter.id}
+                        onClick={() => setChatFilter(filter.id as 'all' | 'unread' | 'online')}
+                        className={cn(
+                          "rounded-full px-4 py-2 text-xs font-semibold transition-colors",
+                          chatFilter === filter.id
+                            ? "bg-primary text-primary-foreground"
+                            : "app-surface-muted text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        {filter.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </header>
+
+            <main className="flex-1 overflow-y-auto px-5 pb-24 pt-5 animate-in fade-in slide-in-from-bottom-2 duration-300 lg:px-6 lg:pb-6">
+              {activeTab === 'chats' && (
+                <div className="space-y-6">
+                  {/* Friend Requests - Small Notification */}
+                  {pendingRequestPeople.length > 0 && !chatSearchQuery && (
+                    <div className="app-surface-muted flex items-center justify-between rounded-[24px] p-3 pl-4 border border-primary/20 bg-primary/5">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/20 text-primary">
+                          <Users className="h-4 w-4" />
+                        </div>
+                        <p className="text-sm font-medium">
+                          {pendingRequestPeople.length} new friend request{pendingRequestPeople.length > 1 ? 's' : ''}
+                        </p>
+                      </div>
+                      <Button variant="ghost" size="sm" className="h-8 rounded-full text-xs font-semibold" onClick={() => setActiveTab('discover')}>
+                        Review
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Active Now - Horizontal Scroll */}
+                  {onlineFriends.length > 0 && !chatSearchQuery && (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between px-1">
+                        <h3 className="text-sm font-semibold text-muted-foreground">Active Now</h3>
+                      </div>
+                      <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-none">
+                        {onlineFriends.map((person) => (
+                          <button
+                            key={person.uid}
+                            onClick={() => openConversation(person.uid)}
+                            className="group flex flex-col items-center gap-1.5 min-w-[72px]"
+                          >
+                            <div className="relative">
+                              <Avatar className="h-16 w-16 ring-2 ring-transparent transition-all group-hover:ring-primary/40">
+                                <AvatarImage src={person.photoURL} />
+                                <AvatarFallback>{person.name[0]}</AvatarFallback>
+                              </Avatar>
+                              <div className="absolute bottom-0.5 right-0.5 h-3.5 w-3.5 rounded-full border-2 border-background bg-emerald-500" />
+                            </div>
+                            <span className="w-full truncate text-center text-xs font-medium text-foreground">{person.name.split(' ')[0]}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Chat List */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between px-1 mb-2">
+                      <h3 className="text-sm font-semibold text-muted-foreground">Messages</h3>
+                      {totalUnread > 0 && (
+                        <Badge variant="secondary" className="rounded-full bg-primary/10 text-primary hover:bg-primary/20">
+                          {totalUnread} new
+                        </Badge>
+                      )}
+                    </div>
+
+                    {chatRows.length === 0 && (
+                      <div className="app-surface-muted rounded-[30px] border-dashed p-8 text-center">
+                        <p className="text-base font-semibold">No conversations yet</p>
+                        <p className="mt-2 text-sm text-muted-foreground">
+                          Head to the People tab and start your first chat.
+                        </p>
+                      </div>
+                    )}
+                    {chatRows.length > 0 && visibleChatRows.length === 0 && (
+                      <div className="app-surface-muted rounded-[30px] border-dashed p-8 text-center">
+                        <p className="text-base font-semibold">Nothing matches your search</p>
+                        <p className="mt-2 text-sm text-muted-foreground">
+                          Try a different name, message preview, or filter.
+                        </p>
+                      </div>
+                    )}
+
+                    {visibleChatRows.map((chat) => (
+                      <button
+                        key={chat.chatId}
+                        onClick={() => openConversation(chat.otherUid, chat.chatId)}
+                        className={cn(
+                          "app-card-hover w-full rounded-[24px] px-3 py-3 text-left transition-all",
+                          selectedOtherUid === chat.otherUid
+                            ? "bg-primary/10 shadow-sm border border-primary/20"
+                            : "hover:bg-muted/50 border border-transparent"
+                        )}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="relative">
+                            <Avatar className="h-14 w-14">
+                              <AvatarImage src={chat.avatar} />
+                              <AvatarFallback>{chat.name[0]}</AvatarFallback>
+                            </Avatar>
+                            {chat.online && (
+                              <div className="absolute bottom-0.5 right-0.5 h-3.5 w-3.5 rounded-full border-2 border-background bg-emerald-500" />
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="mb-0.5 flex items-center justify-between gap-3">
+                              <h3 className="truncate text-[15px] font-semibold">{chat.name}</h3>
+                              <span className={cn("shrink-0 text-xs", chat.unread > 0 ? "font-semibold text-primary" : "font-medium text-muted-foreground")}>{chat.time}</span>
+                            </div>
+                            <div className="flex items-center justify-between gap-3">
+                              <p className={cn("truncate text-sm", chat.unread > 0 ? "font-semibold text-foreground" : "text-muted-foreground")}>
+                                {chat.lastMessage || 'Say hello 👋'}
+                              </p>
+                              {chat.unread > 0 && (
+                                <Badge className="h-5 min-w-5 rounded-full bg-primary p-0 px-1.5 text-[10px] text-primary-foreground">
+                                  {chat.unread}
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'discover' && (
+                <div className="space-y-6">
+                  {/* Clean Search Input */}
+                  <div className="relative">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                    <Input
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search people by name..."
+                      className="app-input h-14 rounded-full border-none pl-12 shadow-sm text-base"
+                    />
+                  </div>
+
+                  {pendingRequestPeople.length > 0 && (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between px-1">
+                        <h3 className="text-sm font-semibold text-muted-foreground">Incoming Requests</h3>
+                        <Badge variant="secondary" className="rounded-full">{pendingRequestPeople.length}</Badge>
+                      </div>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        {pendingRequestPeople.map((person) => (
+                          <div key={person.uid} className="app-surface-muted flex flex-col gap-3 rounded-[24px] p-3 sm:flex-row sm:items-center sm:justify-between border border-primary/20 bg-primary/5">
+                            <div className="flex min-w-0 items-center gap-3">
+                              <Avatar className="h-11 w-11">
+                                <AvatarImage src={person.photoURL} />
+                                <AvatarFallback>{person.name[0]}</AvatarFallback>
+                              </Avatar>
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-semibold">{person.name}</p>
+                                <p className="truncate text-xs text-muted-foreground">{person.status || 'Wants to connect'}</p>
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button size="sm" className="rounded-full px-4" onClick={() => handleAcceptFriendRequest(person.uid)}>
+                                Accept
+                              </Button>
+                              <Button size="sm" variant="ghost" className="rounded-full px-3" onClick={() => handleRejectFriendRequest(person.uid)}>
+                                Reject
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {discoverOnlinePeople.length > 0 && (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between px-1">
+                        <h3 className="text-sm font-semibold text-muted-foreground">Online Now</h3>
+                      </div>
+                      <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-none">
+                        {discoverOnlinePeople.map((person) => {
+                          const isFriend = myFriends.includes(person.uid);
+                          return (
+                            <div key={person.uid} className="group flex flex-col items-center gap-2 min-w-[80px]">
+                              <button onClick={() => isFriend ? openConversation(person.uid) : null} className="relative">
+                                <Avatar className="h-16 w-16 ring-2 ring-transparent transition-all group-hover:ring-primary/40">
+                                  <AvatarImage src={person.photoURL} />
+                                  <AvatarFallback>{person.name[0]}</AvatarFallback>
+                                </Avatar>
+                                <div className="absolute bottom-0.5 right-0.5 h-3.5 w-3.5 rounded-full border-2 border-background bg-emerald-500" />
+                              </button>
+                              <span className="w-full truncate text-center text-xs font-medium text-foreground">{person.name.split(' ')[0]}</span>
+                              {!isFriend && (
+                                <Button size="sm" variant="secondary" className="h-6 rounded-full px-3 text-[10px]" onClick={() => handleSendFriendRequest(person.uid)}>
+                                  Add
+                                </Button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between px-1">
+                      <h3 className="text-sm font-semibold text-muted-foreground">People Directory</h3>
+                      <Badge variant="secondary" className="rounded-full text-xs">
+                        {discoverSuggestions.length} suggestions
+                      </Badge>
+                    </div>
+                    
+                    <div className="flex flex-col gap-2">
+                      {filteredDirectory.length === 0 && (
+                        <div className="app-surface-muted rounded-[30px] border-dashed p-8 text-center text-sm text-muted-foreground">
+                          No one else has signed up yet. Invite a friend and build your network.
+                        </div>
+                      )}
+                      {filteredDirectory.map((person) => {
+                        const isFriend = myFriends.includes(person.uid);
+                        const hasOutgoing = outgoingRequests.includes(person.uid);
+                        const hasIncoming = incomingRequests.includes(person.uid);
+                        return (
+                          <div key={person.uid} className="app-card-hover flex items-center justify-between gap-4 rounded-[24px] p-3 hover:bg-muted/50 transition-colors">
+                            <div className="flex min-w-0 items-center gap-3">
+                              <div className="relative">
+                                <Avatar className="h-12 w-12">
+                                  <AvatarImage src={person.photoURL} />
+                                  <AvatarFallback>{person.name[0]}</AvatarFallback>
+                                </Avatar>
+                                {person.online && (
+                                  <div className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-background bg-emerald-500" />
+                                )}
+                              </div>
+                              <div className="min-w-0">
+                                <h4 className="truncate text-[15px] font-semibold">{person.name}</h4>
+                                <p className="truncate text-sm text-muted-foreground">
+                                  {person.status || (person.online ? 'Online' : 'Offline')}
+                                </p>
+                              </div>
+                            </div>
+                            
+                            <div className="flex items-center gap-2">
+                               {isFriend ? (
+                                <Button variant="secondary" size="sm" className="rounded-full" onClick={() => openConversation(person.uid)}>
+                                  Message
+                                </Button>
+                              ) : hasIncoming ? (
+                                <div className="flex gap-1">
+                                  <Button size="sm" className="rounded-full" onClick={() => handleAcceptFriendRequest(person.uid)}>Accept</Button>
+                                  <Button variant="ghost" size="sm" className="rounded-full" onClick={() => handleRejectFriendRequest(person.uid)}>Reject</Button>
+                                </div>
+                              ) : hasOutgoing ? (
+                                <Button variant="outline" size="sm" className="rounded-full text-xs" onClick={() => handleCancelFriendRequest(person.uid)}>
+                                  Cancel Request
+                                </Button>
+                              ) : (
+                                <Button variant="default" size="sm" className="rounded-full" onClick={() => handleSendFriendRequest(person.uid)}>
+                                  Add Friend
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'calls' && (
+                <div className="space-y-3">
+                  {callHistory.length === 0 && (
+                    <div className="app-surface-muted rounded-[30px] border-dashed p-8 text-center">
+                      <p className="text-base font-semibold">No calls yet</p>
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        Voice and video history will appear here once you connect.
+                      </p>
+                    </div>
+                  )}
+                  {callHistory.map((call) => {
+                    const isOutgoing = call.callerId === user.uid;
+                    const other = isOutgoing
+                      ? { name: call.calleeName, avatar: call.calleeAvatar }
+                      : { name: call.callerName, avatar: call.callerAvatar };
+                    const missed = call.status === 'declined' || call.status === 'missed';
+                    return (
+                      <div key={call.id} className="app-surface app-card-hover flex items-center gap-4 rounded-[30px] p-4">
+                        <Avatar className="h-12 w-12">
+                          <AvatarImage src={other.avatar} />
+                          <AvatarFallback>{other.name?.[0]}</AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0 flex-1">
+                          <h4 className={cn("truncate font-semibold text-sm", missed && "text-destructive")}>
+                            {other.name}
+                          </h4>
+                          <div className="flex items-center gap-1.5">
+                            {isOutgoing ? (
+                              <PhoneOutgoing className="h-3 w-3 text-muted-foreground" />
+                            ) : missed ? (
+                              <PhoneMissed className="h-3 w-3 text-destructive" />
+                            ) : (
+                              <PhoneIncoming className="h-3 w-3 text-muted-foreground" />
+                            )}
+                            <span className="text-[11px] capitalize text-muted-foreground">{call.type} call</span>
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => callManager.startCall({ id: isOutgoing ? call.calleeId : call.callerId, name: other.name, avatar: other.avatar }, call.type)}
+                          className="rounded-full text-primary hover:bg-primary/5"
+                        >
+                          {call.type === 'voice' ? <Phone className="h-5 w-5" /> : <Video className="h-5 w-5" />}
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {activeTab === 'settings' && (
+                <div className="lg:hidden">
+                  {renderSettingsContent()}
                 </div>
               )}
             </main>
           </section>
 
           {!isMobile && activeTab === 'chats' && (
-            <section className="app-grid-lines hidden min-h-0 flex-1 bg-background/35 lg:flex">
+            <section className="app-grid-lines hidden min-h-0 flex-1 lg:ml-4 lg:flex lg:rounded-[34px] lg:border lg:border-border/70 lg:bg-background/52 lg:shadow-[0_24px_60px_rgba(0,0,0,0.22)] lg:backdrop-blur-2xl">
               {selectedPerson ? (
                 <ChatView
                   embedded
@@ -1219,14 +1240,28 @@ export default function MessengerApp() {
                 />
               ) : (
                 <div className="flex flex-1 items-center justify-center p-10">
-                  <div className="app-hero max-w-md rounded-[36px] p-10 text-center">
-                    <div className="app-surface mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-[28px] text-primary">
+                  <div className="app-hero max-w-lg rounded-[40px] p-10 text-center">
+                    <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-[28px] bg-primary/12 text-primary">
                       <MessageSquare className="h-9 w-9" />
                     </div>
                     <h2 className="text-gradient-brand text-2xl font-bold font-headline">Pick a conversation</h2>
                     <p className="mt-3 text-sm text-muted-foreground">
-                      Your messages, media, typing indicators, and calls will show up here in a full desktop conversation view.
+                      Select a chat from the left to open a distraction-free conversation space with messages, media, reactions, typing, and calls.
                     </p>
+                    <div className="mt-6 grid grid-cols-3 gap-3 text-left">
+                      <div className="app-surface rounded-[24px] p-3">
+                        <p className="text-[11px] font-medium text-muted-foreground">Focused</p>
+                        <p className="mt-1 text-sm font-semibold">Clean desktop layout</p>
+                      </div>
+                      <div className="app-surface rounded-[24px] p-3">
+                        <p className="text-[11px] font-medium text-muted-foreground">Comfortable</p>
+                        <p className="mt-1 text-sm font-semibold">Balanced dark mode</p>
+                      </div>
+                      <div className="app-surface rounded-[24px] p-3">
+                        <p className="text-[11px] font-medium text-muted-foreground">Ready</p>
+                        <p className="mt-1 text-sm font-semibold">Calls and messaging</p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}

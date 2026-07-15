@@ -18,20 +18,20 @@ export function BottomNav({ activeTab, onTabChange, unreadCount = 0 }: BottomNav
   ] as const;
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 h-16 border-t border-border/60 bg-background/85 px-4 pb-safe pt-2 backdrop-blur-xl">
-      <div className="mx-auto flex h-full max-w-md items-center justify-around">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border/60 bg-background/82 px-4 pb-safe pt-2 backdrop-blur-2xl">
+      <div className="mx-auto flex h-16 max-w-md items-center justify-around rounded-t-[28px]">
         {tabs.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
             onClick={() => onTabChange(id)}
             className={cn(
               "relative flex h-full flex-1 flex-col items-center justify-center gap-1 outline-none transition-all duration-200",
-              activeTab === id ? "text-accent" : "text-muted-foreground hover:text-accent/70"
+              activeTab === id ? "text-primary" : "text-muted-foreground hover:text-primary/70"
             )}
           >
             <div className={cn(
-              "relative flex h-8 w-12 items-center justify-center rounded-full transition-all duration-200",
-              activeTab === id && "bg-accent/10"
+              "relative flex h-9 w-14 items-center justify-center rounded-full transition-all duration-200",
+              activeTab === id ? "bg-primary/12 shadow-inner" : "bg-transparent"
             )}>
               <Icon
                 className={cn(
@@ -40,14 +40,14 @@ export function BottomNav({ activeTab, onTabChange, unreadCount = 0 }: BottomNav
                 )}
               />
               {id === 'chats' && unreadCount > 0 && (
-                <span className="absolute -top-1 -right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-gradient-to-br from-accent to-primary px-1 text-[9px] font-bold text-white shadow-sm">
+                <span className="absolute -right-0.5 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent px-1 text-[9px] font-bold text-white shadow-sm">
                   {unreadCount > 99 ? '99+' : unreadCount}
                 </span>
               )}
             </div>
             <span className={cn(
               "text-[10px] font-semibold tracking-tight transition-colors duration-200",
-              activeTab === id ? "text-accent" : "text-muted-foreground"
+              activeTab === id ? "text-primary" : "text-muted-foreground"
             )}>
               {label}
             </span>

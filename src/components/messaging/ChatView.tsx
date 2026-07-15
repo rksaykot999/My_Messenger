@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { ArrowLeft, Phone, Video, Plus, Send, Image as ImageIcon, Camera, Film, Info, Trash2, ShieldOff, ShieldCheck, UserRound, Loader2, Mail, Smile, Reply, X, Search, ChevronUp, ChevronDown } from "lucide-react";
+import { ArrowLeft, Phone, Video, Plus, Send, Image as ImageIcon, Camera, Film, Info, Trash2, ShieldOff, ShieldCheck, UserRound, Loader2, Mail, Smile, Reply, X, Search, ChevronUp, ChevronDown, MessageSquare, ChevronRight, UserMinus } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -324,41 +324,41 @@ export function ChatView({ chat, onBack, onCall, isBlocked, embedded = false }: 
   }, [searchIndex, searchQuery]);
 
   return (
-    <div className={cn("relative flex h-full min-h-0 flex-col bg-background", embedded && "w-full flex-1")}>
-      <header className="sticky top-0 z-10 flex items-center justify-between border-b border-border/60 bg-background/70 px-4 py-3 backdrop-blur-xl">
-        <div className="flex items-center gap-3">
+    <div className={cn("relative flex h-full min-h-0 flex-col bg-transparent", embedded && "w-full flex-1")}>
+      <header className={cn("app-toolbar sticky top-0 z-10 flex items-center justify-between px-4 py-3", embedded && "lg:rounded-t-[34px]")}>
+        <div className="flex items-center gap-3 min-w-0">
           {!embedded && (
-            <Button variant="ghost" size="icon" onClick={onBack} className="-ml-2 rounded-full">
+            <Button variant="ghost" size="icon" onClick={onBack} className="-ml-2 shrink-0 rounded-full">
               <ArrowLeft className="h-5 w-5" />
             </Button>
           )}
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <Avatar className="h-10 w-10 ring-2 ring-background shadow-md">
+          <button onClick={() => setContactInfoOpen(true)} className="flex items-center gap-3 min-w-0 text-left hover:opacity-80 transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-xl p-1 -ml-1">
+            <div className="relative shrink-0">
+              <Avatar className="h-10 w-10 ring-2 ring-background/80 shadow-md">
                 <AvatarImage src={chat.avatar} />
                 <AvatarFallback>{chat.name.substring(0, 2)}</AvatarFallback>
               </Avatar>
               {chat.online && <div className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-background bg-emerald-500" />}
             </div>
-            <div>
-              <h3 className="text-sm font-semibold leading-none font-headline">{chat.name}</h3>
-              <p className={cn("mt-1.5 text-[11px]", otherTyping ? "font-medium text-accent" : "text-muted-foreground")}>
+            <div className="min-w-0">
+              <h3 className="text-sm font-semibold leading-none truncate">{chat.name}</h3>
+              <p className={cn("mt-1.5 text-[11px] truncate", otherTyping ? "font-medium text-accent" : "text-muted-foreground")}>
                 {blocked ? 'Blocked' : otherTyping ? 'typing…' : chat.online ? 'Online' : formatLastSeen(chat.lastSeen)}
               </p>
             </div>
-          </div>
+          </button>
         </div>
-        <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" onClick={() => setSearchOpen((v) => !v)} className="rounded-full text-primary hover:bg-primary/10">
+        <div className="flex items-center gap-1 shrink-0">
+          <Button variant="ghost" size="icon" onClick={() => setSearchOpen((v) => !v)} className="rounded-full text-muted-foreground hover:bg-primary/10 hover:text-primary">
             <Search className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon" onClick={() => onCall('voice')} className="rounded-full text-primary hover:bg-primary/10">
+          <Button variant="ghost" size="icon" onClick={() => onCall('voice')} className="rounded-full text-muted-foreground hover:bg-primary/10 hover:text-primary">
             <Phone className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon" onClick={() => onCall('video')} className="rounded-full text-primary hover:bg-primary/10">
+          <Button variant="ghost" size="icon" onClick={() => onCall('video')} className="rounded-full text-muted-foreground hover:bg-primary/10 hover:text-primary">
             <Video className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon" onClick={() => setInfoOpen(true)} className="rounded-full text-primary hover:bg-primary/10">
+          <Button variant="ghost" size="icon" onClick={() => setInfoOpen(true)} className="rounded-full text-muted-foreground hover:bg-primary/10 hover:text-primary">
             <Info className="h-4 w-4" />
           </Button>
           {(isUploading) && (
@@ -371,7 +371,7 @@ export function ChatView({ chat, onBack, onCall, isBlocked, embedded = false }: 
 
       {/* In-conversation search bar */}
       {searchOpen && (
-        <div className="flex items-center gap-2 border-b border-border/60 bg-background/70 px-4 py-2 backdrop-blur-xl">
+        <div className="flex items-center gap-2 border-b border-border/60 bg-background/68 px-4 py-2 backdrop-blur-xl">
           <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
           <Input
             autoFocus
@@ -418,13 +418,13 @@ export function ChatView({ chat, onBack, onCall, isBlocked, embedded = false }: 
       <div
         ref={scrollRef}
         className={cn(
-          "app-grid-lines flex flex-1 flex-col space-y-6 overflow-y-auto scroll-smooth p-4",
+          "app-grid-lines flex flex-1 flex-col space-y-6 overflow-y-auto scroll-smooth bg-transparent p-4 lg:p-5",
           embedded ? "pb-32" : "pb-24"
         )}
       >
         {messages.length === 0 && (
           <div className="m-auto flex flex-col items-center text-center">
-            <div className="app-surface mb-3 flex h-16 w-16 items-center justify-center rounded-[24px] text-2xl">
+            <div className="mb-3 flex h-16 w-16 items-center justify-center rounded-[24px] bg-primary/10 text-2xl text-primary">
               👋
             </div>
             <p className="text-sm font-medium text-foreground">Say hi to {chat.name.split(' ')[0]}</p>
@@ -444,7 +444,7 @@ export function ChatView({ chat, onBack, onCall, isBlocked, embedded = false }: 
             key={msg.id}
             ref={(el) => { messageRefs.current[msg.id] = el; }}
             className={cn(
-              "group flex flex-col max-w-[85%] animate-in fade-in slide-in-from-bottom-2 duration-300 rounded-[24px] transition-shadow",
+              "group flex max-w-[85%] flex-col animate-in rounded-[24px] transition-shadow duration-300 fade-in slide-in-from-bottom-2",
               mine ? "ml-auto items-end" : "items-start",
               isSearchHit && !isCurrentHit && "ring-1 ring-accent/40"
             )}
@@ -456,8 +456,8 @@ export function ChatView({ chat, onBack, onCall, isBlocked, embedded = false }: 
                   <button
                     onClick={() => scrollToMessage(msg.replyTo!.id)}
                     className={cn(
-                      "mb-1 max-w-full truncate rounded-xl border-l-2 border-accent px-3 py-1.5 text-left text-xs",
-                      mine ? "bg-primary/10 text-foreground" : "bg-muted/60 text-muted-foreground"
+                      "mb-1 max-w-full truncate rounded-2xl border-l-2 border-primary px-3 py-2 text-left text-xs",
+                      mine ? "bg-primary/12 text-foreground" : "bg-muted/70 text-muted-foreground"
                     )}
                   >
                     <span className="font-semibold text-accent">
@@ -468,13 +468,13 @@ export function ChatView({ chat, onBack, onCall, isBlocked, embedded = false }: 
                 )}
                 <div
                   className={cn(
-                    "overflow-hidden text-sm leading-relaxed shadow-sm",
-                    msg.type === "image" || msg.type === "video" ? "rounded-[22px] p-1" : "rounded-[22px] px-4 py-2.5",
+                    "overflow-hidden border text-sm leading-relaxed shadow-sm",
+                    msg.type === "image" || msg.type === "video" ? "rounded-[24px] p-1.5" : "rounded-[24px] px-4 py-3",
                     msg.deleted
-                      ? "border border-dashed border-border/60 bg-transparent italic text-muted-foreground"
+                      ? "border-dashed border-border/60 bg-transparent italic text-muted-foreground"
                       : mine
-                      ? "rounded-tr-md bg-gradient-to-br from-primary to-primary/80 text-primary-foreground shadow-primary/20"
-                      : "app-surface rounded-tl-md text-foreground"
+                      ? "rounded-br-md border-primary/20 bg-gradient-to-br from-primary to-sky-500 text-primary-foreground shadow-lg shadow-primary/20"
+                      : "rounded-bl-md border-border/70 bg-card/92 text-foreground backdrop-blur-xl"
                   )}
                 >
                   {msg.deleted ? (
@@ -497,7 +497,7 @@ export function ChatView({ chat, onBack, onCall, isBlocked, embedded = false }: 
                 <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
                   <Popover>
                     <PopoverTrigger asChild>
-                      <button className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-accent">
+                      <button className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-primary">
                         <Smile className="h-4 w-4" />
                       </button>
                     </PopoverTrigger>
@@ -515,7 +515,7 @@ export function ChatView({ chat, onBack, onCall, isBlocked, embedded = false }: 
                       </div>
                     </PopoverContent>
                   </Popover>
-                  <button onClick={() => setReplyTo(msg)} className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-accent">
+                  <button onClick={() => setReplyTo(msg)} className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-primary">
                     <Reply className="h-4 w-4" />
                   </button>
                   {mine && (
@@ -538,7 +538,7 @@ export function ChatView({ chat, onBack, onCall, isBlocked, embedded = false }: 
                       onClick={() => handleReact(msg, e)}
                       className={cn(
                         "flex items-center gap-0.5 rounded-full border px-2 py-0.5 text-xs shadow-sm transition-colors",
-                        reactedByMe ? "border-accent/40 bg-accent/15" : "border-border/60 bg-background/80"
+                        reactedByMe ? "border-primary/40 bg-primary/10" : "border-border/60 bg-background/80"
                       )}
                     >
                       <span>{e}</span>
@@ -567,7 +567,7 @@ export function ChatView({ chat, onBack, onCall, isBlocked, embedded = false }: 
         {/* Typing indicator bubble */}
         {otherTyping && !blocked && (
           <div className="flex flex-col max-w-[85%] items-start animate-in fade-in slide-in-from-bottom-2 duration-300">
-            <div className="app-surface flex h-10 items-center gap-1 rounded-[22px] rounded-tl-md px-4 py-3 text-foreground shadow-sm">
+            <div className="flex h-10 items-center gap-1 rounded-[22px] rounded-tl-md border border-border/70 bg-card/92 px-4 py-3 text-foreground shadow-sm backdrop-blur-xl">
               <div className="w-1.5 h-1.5 bg-muted-foreground/60 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
               <div className="w-1.5 h-1.5 bg-muted-foreground/60 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
               <div className="w-1.5 h-1.5 bg-muted-foreground/60 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
@@ -582,16 +582,16 @@ export function ChatView({ chat, onBack, onCall, isBlocked, embedded = false }: 
       {/* Input Area */}
       <div
         className={cn(
-          "left-0 right-0 z-20 border-t border-border/60 bg-background/85 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] backdrop-blur-xl",
-          embedded ? "absolute bottom-0" : "fixed bottom-0"
+          "left-0 right-0 z-20 border-t border-border/60 bg-background/78 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] backdrop-blur-2xl",
+          embedded ? "absolute bottom-0 lg:rounded-b-[34px]" : "fixed bottom-0"
         )}
       >
         {replyTo && (
           <div className={cn("mb-2 flex items-center gap-2", embedded ? "mx-0" : "max-w-md mx-auto")}>
-            <div className="flex flex-1 items-center gap-2 rounded-xl border-l-2 border-accent bg-muted/50 px-3 py-2">
-              <Reply className="h-4 w-4 shrink-0 text-accent" />
+            <div className="flex flex-1 items-center gap-2 rounded-2xl border border-primary/20 border-l-2 bg-primary/10 px-3 py-2.5">
+              <Reply className="h-4 w-4 shrink-0 text-primary" />
               <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-semibold text-accent">
+                <p className="text-[11px] font-semibold text-primary">
                   Replying to {replyTo.senderId === user?.uid ? "yourself" : chat.name.split(" ")[0]}
                 </p>
                 <p className="truncate text-xs text-muted-foreground">
@@ -607,7 +607,7 @@ export function ChatView({ chat, onBack, onCall, isBlocked, embedded = false }: 
         <div className={cn("flex items-end gap-2", embedded ? "mx-0" : "max-w-md mx-auto")}>
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="secondary" size="icon" className="h-11 w-11 shrink-0 rounded-full app-surface-muted border-0" disabled={blocked || isUploading}>
+              <Button variant="secondary" size="icon" className="h-11 w-11 shrink-0 rounded-full border-0 app-surface-muted" disabled={blocked || isUploading}>
                 {isUploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Plus className="h-5 w-5" />}
               </Button>
             </PopoverTrigger>
@@ -653,21 +653,21 @@ export function ChatView({ chat, onBack, onCall, isBlocked, embedded = false }: 
             onChange={(e) => { handleAttachmentSelected(e.target.files?.[0], "video"); e.target.value = ""; }}
           />
 
-          <div className="flex-1 relative">
+          <div className="relative flex-1">
             <Input
               value={inputText}
               onChange={(e) => handleInputChange(e.target.value)}
               onKeyDown={handleKeyPress}
               placeholder={blocked ? "You've blocked this user" : "Message..."}
               disabled={blocked}
-              className="min-h-[46px] rounded-3xl border border-border/50 bg-muted/40 py-3 pr-11 focus-visible:ring-1 focus-visible:ring-accent"
+              className="app-input min-h-[48px] rounded-[28px] border py-3 pr-11 focus-visible:ring-1 focus-visible:ring-primary"
             />
             <Popover>
               <PopoverTrigger asChild>
                 <button
                   type="button"
                   disabled={blocked}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-accent disabled:opacity-50"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-primary disabled:opacity-50"
                 >
                   <Smile className="h-5 w-5" />
                 </button>
@@ -695,7 +695,7 @@ export function ChatView({ chat, onBack, onCall, isBlocked, embedded = false }: 
             className={cn(
               "h-11 w-11 shrink-0 rounded-full p-0 shadow-lg transition-transform active:scale-95",
               inputText.trim() && !blocked
-                ? "bg-gradient-to-br from-accent to-primary shadow-accent/30 hover:opacity-90"
+                ? "bg-gradient-to-br from-primary to-accent text-primary-foreground shadow-primary/30 hover:opacity-90"
                 : "bg-muted text-muted-foreground shadow-none"
             )}
           >
@@ -706,7 +706,7 @@ export function ChatView({ chat, onBack, onCall, isBlocked, embedded = false }: 
 
       {/* Info / options sheet (replaces old "Chat with AI" button) */}
       <Sheet open={infoOpen} onOpenChange={setInfoOpen}>
-        <SheetContent side="bottom" className="rounded-t-3xl max-w-md mx-auto">
+        <SheetContent side="bottom" className="mx-auto max-w-md rounded-t-3xl border-border/70 bg-background/96">
           <SheetHeader className="mb-2">
             <SheetTitle className="text-left">Conversation Options</SheetTitle>
           </SheetHeader>
@@ -747,48 +747,89 @@ export function ChatView({ chat, onBack, onCall, isBlocked, embedded = false }: 
 
       {/* Contact info sheet */}
       <Sheet open={contactInfoOpen} onOpenChange={setContactInfoOpen}>
-        <SheetContent side="bottom" className="rounded-t-3xl max-w-md mx-auto">
-          <SheetHeader className="mb-2">
-            <SheetTitle className="text-left">Contact Info</SheetTitle>
+        <SheetContent side="right" className="w-full sm:max-w-md border-l border-border/70 bg-background/96 p-0 overflow-y-auto [&>button]:hidden">
+          <SheetHeader className="sr-only">
+            <SheetTitle>Profile Details</SheetTitle>
           </SheetHeader>
-          <div className="flex flex-col items-center text-center py-4 mb-2">
-            <Avatar className="h-24 w-24 mb-3 ring-4 ring-background shadow-xl">
-              <AvatarImage src={chat.avatar} />
-              <AvatarFallback className="text-xl">{chat.name[0]}</AvatarFallback>
-            </Avatar>
-            <h4 className="text-lg font-bold font-headline">{chat.name}</h4>
-            <p className="text-xs text-muted-foreground mt-1">
-              {blocked ? 'Blocked' : chat.online ? 'Online now' : 'Offline'}
-            </p>
+          <div className="flex items-center p-4">
+            <Button variant="ghost" size="icon" onClick={() => setContactInfoOpen(false)} className="rounded-full mr-2">
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <h2 className="text-lg font-bold mx-auto pr-10 font-headline">Profile Details</h2>
           </div>
-          <div className="space-y-1">
-            {chat.email && (
-              <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/40">
-                <div className="bg-muted p-2 rounded-lg"><Mail className="h-4 w-4" /></div>
-                <div className="text-left min-w-0">
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Email</p>
-                  <p className="text-sm font-medium truncate">{chat.email}</p>
+          <div className="p-6 pt-2">
+            <div className="flex flex-col items-center text-center mb-8">
+              <div className="relative">
+                <Avatar className="h-28 w-28 mb-3 ring-4 ring-background shadow-xl">
+                  <AvatarImage src={chat.avatar} />
+                  <AvatarFallback className="text-3xl">{chat.name.substring(0, 2)}</AvatarFallback>
+                </Avatar>
+                {chat.online && <div className="absolute bottom-2 right-1 h-5 w-5 rounded-full border-4 border-background bg-emerald-500" />}
+              </div>
+              <h4 className="text-2xl font-bold font-headline">{chat.name}</h4>
+              <p className="text-sm text-emerald-500 font-medium mt-1">
+                {blocked ? 'Blocked' : chat.online ? 'Active Now' : 'Offline'}
+              </p>
+              <button className="mt-3 bg-muted/50 hover:bg-muted text-xl p-2.5 rounded-full transition-colors leading-none">
+                👋
+              </button>
+            </div>
+            
+            <div className="space-y-6">
+              <div>
+                <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2 px-2">Contact Information</h4>
+                <div className="bg-muted/10 border border-border/40 rounded-[24px] p-2 space-y-1">
+                  <div className="flex items-center gap-4 p-3 rounded-2xl hover:bg-muted/20 transition-colors">
+                    <Mail className="h-5 w-5 text-muted-foreground" />
+                    <div className="text-left min-w-0 flex-1">
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Email Address</p>
+                      <p className="text-sm font-medium truncate">{chat.email || "Hidden"}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4 p-3 rounded-2xl hover:bg-muted/20 transition-colors">
+                    <MessageSquare className="h-5 w-5 text-muted-foreground" />
+                    <div className="text-left min-w-0 flex-1">
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Bio / Tagline</p>
+                      <p className="text-sm font-medium truncate">{chat.status || "Empty"}</p>
+                    </div>
+                  </div>
                 </div>
               </div>
-            )}
-            {chat.status && (
-              <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/40">
-                <div className="bg-muted p-2 rounded-lg"><UserRound className="h-4 w-4" /></div>
-                <div className="text-left min-w-0">
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Status</p>
-                  <p className="text-sm font-medium truncate">{chat.status}</p>
+
+              <div>
+                <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2 px-2">Quick Actions</h4>
+                <div className="bg-muted/10 border border-border/40 rounded-[24px] p-2 space-y-1">
+                  <button onClick={() => setContactInfoOpen(false)} className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-muted/20 transition-colors">
+                    <div className="flex items-center gap-3 text-primary">
+                      <MessageSquare className="h-5 w-5" />
+                      <span className="text-sm font-medium">Send Message</span>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </button>
+                  <button onClick={() => { setContactInfoOpen(false); setConfirmDelete(true); }} className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-destructive/10 transition-colors">
+                    <div className="flex items-center gap-3 text-destructive">
+                      <Trash2 className="h-5 w-5" />
+                      <span className="text-sm font-medium text-destructive">Clear Chat History</span>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </button>
+                  <button onClick={() => { alert('Unfriend functionality coming soon'); }} className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-destructive/10 transition-colors">
+                    <div className="flex items-center gap-3 text-destructive">
+                      <UserMinus className="h-5 w-5" />
+                      <span className="text-sm font-medium text-destructive">Unfriend</span>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </button>
+                  <button onClick={() => { setContactInfoOpen(false); setConfirmBlock(true); }} className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-destructive/10 transition-colors">
+                    <div className="flex items-center gap-3 text-destructive">
+                      <ShieldOff className="h-5 w-5" />
+                      <span className="text-sm font-medium text-destructive">{blocked ? 'Unblock User' : 'Block User'}</span>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </button>
                 </div>
               </div>
-            )}
-            <button
-              onClick={() => { setContactInfoOpen(false); setConfirmBlock(true); }}
-              className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-muted/50 text-left mt-2"
-            >
-              <div className="bg-destructive/10 p-2 rounded-lg">
-                {blocked ? <ShieldCheck className="h-4 w-4 text-destructive" /> : <ShieldOff className="h-4 w-4 text-destructive" />}
-              </div>
-              <span className="text-sm font-medium text-destructive">{blocked ? 'Unblock User' : 'Block User'}</span>
-            </button>
+            </div>
           </div>
         </SheetContent>
       </Sheet>
