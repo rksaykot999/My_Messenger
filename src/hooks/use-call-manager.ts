@@ -125,8 +125,9 @@ export function useCallManager() {
       setActiveCall((prev) =>
         prev ? { ...prev, status: "connected", localStream: session.localStream } : prev
       );
-    } catch (e) {
+    } catch (e: any) {
       console.error("Failed to answer call", e);
+      alert(`Call failed: ${e.message || e}`);
       endLocalSession("ended");
     }
   }, [incomingCall, endLocalSession]);
