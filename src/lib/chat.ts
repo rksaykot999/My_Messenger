@@ -44,6 +44,10 @@ export interface ChatSummary {
   lastSenderId?: string;
   unread?: Record<string, number>;
   typing?: Record<string, Timestamp | null>;
+  isGroup?: boolean;
+  groupName?: string;
+  groupAvatar?: string;
+  adminId?: string;
 }
 
 export interface DirectoryUser {
@@ -78,6 +82,29 @@ export async function ensureChat(uidA: string, uidB: string) {
     });
   }
   return chatId;
+}
+
+export async function createGroupChat(myUid: string, participantUids: string[], groupName: string) {
+  const allParticipants = [myUid, ...participantUids];
+  const chatRef = doc(collection(db, "chats"));
+  
+  const initialUnread: Record<string, number> = {};
+  allParticipants.forEach(uid => {
+    initialUnread[uid] = 0;
+  });
+
+  await setDoc(chatRef, {
+    participants: allParticipants,
+    isGroup: true,
+    groupName,
+    adminId: myUid,
+    lastMessage: "Group created",
+    lastMessageAt: serverTimestamp(),
+    createdAt: serverTimestamp(),
+    unread: initialUnread,
+  });
+
+  return chatRef.id;
 }
 
 export function subscribeChats(
@@ -268,6 +295,21 @@ export async function deleteChatHistory(chatId: string) {
     lastMessage: "",
     lastMessageAt: serverTimestamp(),
   });
+  await batch.commit();
+}
+
+export async function leaveGroupChat(chatId: string, uid: string) {
+  const chatRef = doc(db, "chats", chatId);
+  await updateDoc(chatRef, {
+    participants: arrayRemove(uid),
+  });
+}
+
+export async function deleteGroupChat(chatId: string) {
+  const msgsSnap = await getDocs(collection(db, "chats", chatId, "messages"));
+  const batch = writeBatch(db);
+  msgsSnap.docs.forEach((d) => batch.delete(d.ref));
+  batch.delete(doc(db, "chats", chatId));
   await batch.commit();
 }
 

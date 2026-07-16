@@ -35,6 +35,9 @@ import {
   cancelFriendRequest,
   acceptFriendRequest,
   rejectFriendRequest,
+  createGroupChat,
+  leaveGroupChat,
+  deleteGroupChat,
   type ChatSummary,
   type DirectoryUser,
 } from "@/lib/chat";
@@ -87,6 +90,10 @@ export default function MessengerApp() {
   const [outgoingRequests, setOutgoingRequests] = useState<string[]>([]);
   const [incomingRequests, setIncomingRequests] = useState<string[]>([]);
   const [selectedOtherUid, setSelectedOtherUid] = useState<string | null>(null);
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+  const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
+  const [createGroupName, setCreateGroupName] = useState('');
+  const [createGroupSelectedFriends, setCreateGroupSelectedFriends] = useState<string[]>([]);
 
   const [chatSearchOpen, setChatSearchOpen] = useState(false);
   const [chatSearchQuery, setChatSearchQuery] = useState('');
@@ -162,17 +169,33 @@ export default function MessengerApp() {
     return map;
   }, [directory]);
 
-  // Resolve each Firestore chat into a display-friendly row (other participant's info).
+  // Resolve each Firestore chat into a display-friendly row.
   const chatRows = useMemo(() => {
     if (!user) return [];
     return chats
       .map((chat) => {
+        if (chat.isGroup) {
+          return {
+            chatId: chat.id,
+            isGroup: true,
+            name: chat.groupName || 'Group Chat',
+            avatar: chat.groupAvatar || '',
+            online: false,
+            lastMessage: chat.lastMessage,
+            lastSenderId: chat.lastSenderId,
+            time: timeAgo(chat.lastMessageAt),
+            unread: chat.unread?.[user.uid] || 0,
+            participants: chat.participants,
+          };
+        }
+
         const otherUid = chat.participants.find((p) => p !== user.uid);
         const other = otherUid ? directoryMap[otherUid] : undefined;
         if (!otherUid || !other) return null;
         return {
           chatId: chat.id,
           otherUid,
+          isGroup: false,
           name: other.name,
           avatar: other.photoURL,
           online: !!other.online,
@@ -183,17 +206,19 @@ export default function MessengerApp() {
         };
       })
       .filter(Boolean) as Array<{
-        chatId: string; otherUid: string; name: string; avatar: string;
+        chatId: string; otherUid?: string; isGroup?: boolean; name: string; avatar: string;
         online: boolean; lastMessage: string; lastSenderId?: string; time: string; unread: number;
+        participants?: string[];
       }>;
   }, [chats, directoryMap, user]);
 
   const totalUnread = chatRows.reduce((acc, c) => acc + c.unread, 0);
 
   const activeChatId = useMemo(() => {
+    if (selectedGroupId) return selectedGroupId;
     if (!selectedOtherUid || !user) return null;
     return [user.uid, selectedOtherUid].sort().join('_');
-  }, [selectedOtherUid, user]);
+  }, [selectedGroupId, selectedOtherUid, user]);
 
   useMessageNotifications(
     user?.uid,
@@ -203,24 +228,32 @@ export default function MessengerApp() {
     (chatId) => {
       const chat = chats.find((c) => c.id === chatId);
       const otherUid = chat?.participants.find((p) => p !== user?.uid);
-      if (otherUid) {
-        if (isMobile && !selectedOtherUid) {
+      if (chat?.isGroup) {
+        if (isMobile && !selectedGroupId && !selectedOtherUid) {
+          window.history.pushState({ chatOpen: true }, '');
+        }
+        setSelectedGroupId(chatId);
+        setSelectedOtherUid(null);
+      } else if (otherUid) {
+        if (isMobile && !selectedOtherUid && !selectedGroupId) {
           window.history.pushState({ chatOpen: true }, '');
         }
         setSelectedOtherUid(otherUid);
+        setSelectedGroupId(null);
       }
     }
   );
 
   useEffect(() => {
     const handlePopState = () => {
-      if (selectedOtherUid) {
+      if (selectedOtherUid || selectedGroupId) {
         setSelectedOtherUid(null);
+        setSelectedGroupId(null);
       }
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [selectedOtherUid]);
+  }, [selectedOtherUid, selectedGroupId]);
 
   const filteredDirectory = directory.filter((d) =>
     d.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -247,6 +280,7 @@ export default function MessengerApp() {
   });
 
   const selectedPerson = selectedOtherUid ? directoryMap[selectedOtherUid] : null;
+  const selectedGroupChat = selectedGroupId ? chats.find(c => c.id === selectedGroupId) : null;
   const currentTitle =
     activeTab === 'settings' && settingsView !== 'main'
       ? settingsView.replace(/^\w/, (c) => c.toUpperCase())
@@ -269,15 +303,55 @@ export default function MessengerApp() {
     [filteredDirectory, incomingRequests, myFriends, outgoingRequests]
   );
 
-  const openConversation = async (otherUid: string, chatId?: string) => {
+  const openConversation = async (otherUid: string | null, chatId?: string, isGroup?: boolean) => {
     if (!user) return;
-    if (isMobile && !selectedOtherUid) {
+    if (isMobile && !selectedOtherUid && !selectedGroupId) {
       window.history.pushState({ chatOpen: true }, '');
     }
-    setSelectedOtherUid(otherUid);
+    if (isGroup && chatId) {
+      setSelectedGroupId(chatId);
+      setSelectedOtherUid(null);
+    } else if (otherUid) {
+      setSelectedOtherUid(otherUid);
+      setSelectedGroupId(null);
+    }
     setActiveTab('chats');
     if (chatId) {
       await markChatRead(chatId, user.uid);
+    }
+  };
+
+  const handleCreateGroup = async () => {
+    if (!user || !createGroupName.trim() || createGroupSelectedFriends.length === 0) return;
+    try {
+      const chatId = await createGroupChat(user.uid, createGroupSelectedFriends, createGroupName.trim());
+      setIsCreateGroupOpen(false);
+      setCreateGroupName('');
+      setCreateGroupSelectedFriends([]);
+      openConversation(null, chatId, true);
+    } catch (e: any) {
+      toast({ title: "Error creating group", description: e.message });
+    }
+  };
+
+  const handleLeaveGroup = async (chatId: string) => {
+    if (!user) return;
+    try {
+      await leaveGroupChat(chatId, user.uid);
+      setSelectedGroupId(null);
+      toast({ title: "Left Group", description: "You have left the group chat." });
+    } catch (e: any) {
+      toast({ title: "Error leaving group", description: e.message });
+    }
+  };
+
+  const handleDeleteGroup = async (chatId: string) => {
+    try {
+      await deleteGroupChat(chatId);
+      setSelectedGroupId(null);
+      toast({ title: "Group Deleted", description: "The group chat was deleted." });
+    } catch (e: any) {
+      toast({ title: "Error deleting group", description: e.message });
     }
   };
 
@@ -541,6 +615,33 @@ export default function MessengerApp() {
           { id: selectedPerson.uid, name: selectedPerson.name, avatar: selectedPerson.photoURL },
           type
         )}
+      />
+    );
+  } else if (selectedGroupChat && isMobile) {
+    return (
+      <ChatView
+        chat={{
+          id: selectedGroupChat.id,
+          name: selectedGroupChat.groupName || 'Group Chat',
+          avatar: selectedGroupChat.groupAvatar || '',
+          isGroup: true,
+          participants: selectedGroupChat.participants.map(p => ({
+            uid: p,
+            name: directoryMap[p]?.name || 'Unknown',
+            avatar: directoryMap[p]?.photoURL || '',
+          })),
+          adminId: selectedGroupChat.adminId,
+        }}
+        isBlocked={false}
+        onLeaveGroup={() => handleLeaveGroup(selectedGroupChat.id)}
+        onDeleteGroup={() => handleDeleteGroup(selectedGroupChat.id)}
+        onBack={() => {
+          if (isMobile && window.history.state?.chatOpen) {
+            window.history.back();
+          } else {
+            setSelectedGroupId(null);
+          }
+        }}
       />
     );
   }
@@ -1000,7 +1101,7 @@ export default function MessengerApp() {
                     {visibleChatRows.map((chat) => (
                       <button
                         key={chat.chatId}
-                        onClick={() => openConversation(chat.otherUid, chat.chatId)}
+                        onClick={() => openConversation(chat.otherUid ?? null, chat.chatId, chat.isGroup)}
                         className={cn(
                           "app-card-hover w-full rounded-[24px] px-3 py-3 text-left transition-all",
                           selectedOtherUid === chat.otherUid
@@ -1043,6 +1144,18 @@ export default function MessengerApp() {
                       </button>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {activeTab === 'chats' && (
+                <div className="fixed bottom-20 right-6 z-40 lg:absolute lg:bottom-8 lg:right-8">
+                  <Button
+                    size="icon"
+                    className="h-14 w-14 rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.2)] bg-primary text-primary-foreground hover:bg-primary/90 transition-transform hover:scale-105 active:scale-95"
+                    onClick={() => setIsCreateGroupOpen(true)}
+                  >
+                    <Plus className="h-6 w-6" />
+                  </Button>
                 </div>
               )}
 
@@ -1268,6 +1381,26 @@ export default function MessengerApp() {
                     type
                   )}
                 />
+              ) : selectedGroupChat ? (
+                <ChatView
+                  embedded
+                  chat={{
+                    id: selectedGroupChat.id,
+                    name: selectedGroupChat.groupName || 'Group Chat',
+                    avatar: selectedGroupChat.groupAvatar || '',
+                    isGroup: true,
+                    participants: selectedGroupChat.participants.map(p => ({
+                      uid: p,
+                      name: directoryMap[p]?.name || 'Unknown',
+                      avatar: directoryMap[p]?.photoURL || '',
+                    })),
+                    adminId: selectedGroupChat.adminId,
+                  }}
+                  isBlocked={false}
+                  onLeaveGroup={() => handleLeaveGroup(selectedGroupChat.id)}
+                  onDeleteGroup={() => handleDeleteGroup(selectedGroupChat.id)}
+                  onBack={() => setSelectedGroupId(null)}
+                />
               ) : (
                 <div className="flex flex-1 items-center justify-center p-10">
                   <div className="app-hero max-w-lg rounded-[40px] p-10 text-center">
@@ -1448,6 +1581,73 @@ export default function MessengerApp() {
             </div>
           </DialogContent>
         </Dialog>
+      <Dialog open={isCreateGroupOpen} onOpenChange={setIsCreateGroupOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Create Group Chat</DialogTitle>
+            <DialogDescription>
+              Select friends and enter a name for your new group.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="group-name">Group Name</Label>
+              <Input
+                id="group-name"
+                placeholder="E.g., Weekend Plans"
+                value={createGroupName}
+                onChange={(e) => setCreateGroupName(e.target.value)}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label>Select Friends</Label>
+              <div className="max-h-[200px] overflow-y-auto space-y-2 border rounded-md p-2">
+                {onlineFriends.length === 0 && myFriends.length === 0 ? (
+                  <p className="text-sm text-muted-foreground p-2 text-center">No friends available to add.</p>
+                ) : (
+                  myFriends.map((friendUid) => {
+                    const person = directoryMap[friendUid];
+                    if (!person) return null;
+                    const isSelected = createGroupSelectedFriends.includes(friendUid);
+                    return (
+                      <div
+                        key={friendUid}
+                        className={cn(
+                          "flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-muted transition-colors",
+                          isSelected && "bg-primary/10"
+                        )}
+                        onClick={() => {
+                          setCreateGroupSelectedFriends((prev) =>
+                            isSelected ? prev.filter((id) => id !== friendUid) : [...prev, friendUid]
+                          );
+                        }}
+                      >
+                        <Avatar className="h-8 w-8">
+                          <AvatarImage src={person.photoURL} />
+                          <AvatarFallback>{person.name[0]}</AvatarFallback>
+                        </Avatar>
+                        <span className="text-sm font-medium flex-1">{person.name}</span>
+                        <div className={cn(
+                          "h-4 w-4 rounded border flex items-center justify-center",
+                          isSelected ? "bg-primary border-primary text-primary-foreground" : "border-input"
+                        )}>
+                          {isSelected && <Check className="h-3 w-3" />}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsCreateGroupOpen(false)}>Cancel</Button>
+            <Button onClick={handleCreateGroup} disabled={!createGroupName.trim() || createGroupSelectedFriends.length === 0}>
+              Create Group
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

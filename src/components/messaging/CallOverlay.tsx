@@ -6,6 +6,9 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
+import { registerPlugin } from "@capacitor/core";
+
+const AudioRouter = registerPlugin<any>("AudioRouter");
 
 interface CallOverlayProps {
   name: string;
@@ -35,7 +38,7 @@ export function CallOverlay({
   onToggleVideo,
 }: CallOverlayProps) {
   const [isMuted, setIsMuted] = useState(false);
-  const [isSpeaker, setIsSpeaker] = useState(false);
+  const [isSpeaker, setIsSpeaker] = useState(type === 'video');
   const [isVideoOn, setIsVideoOn] = useState(type === 'video');
   const [timer, setTimer] = useState(0);
 
@@ -57,6 +60,16 @@ export function CallOverlay({
       localVideoRef.current.srcObject = localStream;
     }
   }, [localStream]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        AudioRouter.setSpeaker({ speakerOn: isSpeaker });
+      } catch (e) {
+        console.warn("AudioRouter not available", e);
+      }
+    }
+  }, [isSpeaker]);
 
   const [hasRemoteVideo, setHasRemoteVideo] = useState(
     () => type === 'video' && !!(remoteStream && remoteStream.getVideoTracks().length > 0)

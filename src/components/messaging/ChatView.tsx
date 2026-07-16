@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { ArrowLeft, Phone, Video, Plus, Send, Image as ImageIcon, Camera, Film, Info, Trash2, ShieldOff, ShieldCheck, UserRound, Loader2, Mail, Smile, Reply, X, Search, ChevronUp, ChevronDown, MessageSquare, ChevronRight, UserMinus, Download } from "lucide-react";
+import { ArrowLeft, Phone, Video, Plus, Send, Image as ImageIcon, Camera, Film, Info, Trash2, ShieldOff, ShieldCheck, UserRound, Loader2, Mail, Smile, Reply, X, Search, ChevronUp, ChevronDown, MessageSquare, ChevronRight, UserMinus, Download, LogOut } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,10 +56,23 @@ import { useToast } from "@/hooks/use-toast";
 import type { Timestamp } from "firebase/firestore";
 
 interface ChatViewProps {
-  chat: { id: string; name: string; avatar: string; online: boolean; status?: string; email?: string; lastSeen?: Timestamp | null };
-  onBack: () => void;
-  onCall: (type: 'voice' | 'video') => void;
+  chat: {
+    id: string; // The person uid or the chat doc id
+    name: string;
+    avatar: string;
+    online?: boolean;
+    status?: string;
+    email?: string;
+    lastSeen?: any;
+    isGroup?: boolean;
+    participants?: { uid: string; name: string; avatar: string }[];
+    adminId?: string;
+  };
   isBlocked?: boolean;
+  onBack?: () => void;
+  onCall?: (type: 'voice' | 'video') => void;
+  onLeaveGroup?: () => void;
+  onDeleteGroup?: () => void;
   embedded?: boolean;
 }
 
@@ -70,7 +83,7 @@ const PICKER_EMOJIS = ["😀","😁","😂","🤣","😊","😍","😘","😎","
 // probably closed the tab without clearing it).
 const TYPING_TTL_MS = 6000;
 
-export function ChatView({ chat, onBack, onCall, isBlocked, embedded = false }: ChatViewProps) {
+export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, isBlocked, embedded = false }: ChatViewProps) {
   const { user } = useAuth();
   const { settings } = useSettings();
   const { toast } = useToast();
@@ -81,6 +94,8 @@ export function ChatView({ chat, onBack, onCall, isBlocked, embedded = false }: 
   const [contactInfoOpen, setContactInfoOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmBlock, setConfirmBlock] = useState(false);
+  const [confirmLeave, setConfirmLeave] = useState(false);
+  const [confirmDeleteGroup, setConfirmDeleteGroup] = useState(false);
   const [blocked, setBlocked] = useState(!!isBlocked);
   const [otherTyping, setOtherTyping] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -370,12 +385,16 @@ export function ChatView({ chat, onBack, onCall, isBlocked, embedded = false }: 
           <Button variant="ghost" size="icon" onClick={() => setSearchOpen((v) => !v)} className="rounded-full text-muted-foreground hover:bg-primary/10 hover:text-primary">
             <Search className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon" onClick={() => onCall('voice')} className="rounded-full text-muted-foreground hover:bg-primary/10 hover:text-primary">
-            <Phone className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="icon" onClick={() => onCall('video')} className="rounded-full text-muted-foreground hover:bg-primary/10 hover:text-primary">
-            <Video className="h-4 w-4" />
-          </Button>
+          {!chat.isGroup && (
+            <>
+              <Button variant="ghost" size="icon" onClick={() => onCall?.('voice')} className="rounded-full text-muted-foreground hover:bg-primary/10 hover:text-primary">
+                <Phone className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="icon" onClick={() => onCall?.('video')} className="rounded-full text-muted-foreground hover:bg-primary/10 hover:text-primary">
+                <Video className="h-4 w-4" />
+              </Button>
+            </>
+          )}
           <Popover open={infoOpen} onOpenChange={setInfoOpen}>
             <PopoverTrigger asChild>
               <Button variant="ghost" size="icon" className="rounded-full text-muted-foreground hover:bg-primary/10 hover:text-primary">
@@ -402,24 +421,44 @@ export function ChatView({ chat, onBack, onCall, isBlocked, embedded = false }: 
                   className="w-full flex items-center gap-3 p-3.5 rounded-2xl border border-border/50 hover:bg-muted/50 text-left transition-colors"
                 >
                   <div className="bg-muted p-2 rounded-xl"><UserRound className="h-4 w-4" /></div>
-                  <span className="text-sm font-semibold">View Contact Info</span>
+                  <span className="text-sm font-semibold">{chat.isGroup ? 'View Group Info' : 'View Contact Info'}</span>
                 </button>
-                <button
-                  onClick={() => { setInfoOpen(false); setConfirmDelete(true); }}
-                  className="w-full flex items-center gap-3 p-3.5 rounded-2xl hover:bg-destructive/10 text-left transition-colors group"
-                >
-                  <div className="bg-destructive/10 group-hover:bg-destructive/20 p-2 rounded-xl transition-colors"><Trash2 className="h-4 w-4 text-destructive" /></div>
-                  <span className="text-sm font-semibold text-destructive">Delete Chat History</span>
-                </button>
-                <button
-                  onClick={() => { setInfoOpen(false); setConfirmBlock(true); }}
-                  className="w-full flex items-center gap-3 p-3.5 rounded-2xl hover:bg-destructive/10 text-left transition-colors group"
-                >
-                  <div className="bg-destructive/10 group-hover:bg-destructive/20 p-2 rounded-xl transition-colors">
-                    {blocked ? <ShieldCheck className="h-4 w-4 text-destructive" /> : <ShieldOff className="h-4 w-4 text-destructive" />}
-                  </div>
-                  <span className="text-sm font-semibold text-destructive">{blocked ? 'Unblock User' : 'Block User'}</span>
-                </button>
+                {!chat.isGroup ? (
+                  <button
+                    onClick={() => { setInfoOpen(false); setConfirmDelete(true); }}
+                    className="w-full flex items-center gap-3 p-3.5 rounded-2xl hover:bg-destructive/10 text-left transition-colors group"
+                  >
+                    <div className="bg-destructive/10 group-hover:bg-destructive/20 p-2 rounded-xl transition-colors"><Trash2 className="h-4 w-4 text-destructive" /></div>
+                    <span className="text-sm font-semibold text-destructive">Delete Chat History</span>
+                  </button>
+                ) : chat.adminId === user?.uid ? (
+                  <button
+                    onClick={() => { setInfoOpen(false); setConfirmDeleteGroup(true); }}
+                    className="w-full flex items-center gap-3 p-3.5 rounded-2xl hover:bg-destructive/10 text-left transition-colors group"
+                  >
+                    <div className="bg-destructive/10 group-hover:bg-destructive/20 p-2 rounded-xl transition-colors"><Trash2 className="h-4 w-4 text-destructive" /></div>
+                    <span className="text-sm font-semibold text-destructive">Delete Group</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => { setInfoOpen(false); setConfirmLeave(true); }}
+                    className="w-full flex items-center gap-3 p-3.5 rounded-2xl hover:bg-destructive/10 text-left transition-colors group"
+                  >
+                    <div className="bg-destructive/10 group-hover:bg-destructive/20 p-2 rounded-xl transition-colors"><LogOut className="h-4 w-4 text-destructive" /></div>
+                    <span className="text-sm font-semibold text-destructive">Leave Group</span>
+                  </button>
+                )}
+                {!chat.isGroup && (
+                  <button
+                    onClick={() => { setInfoOpen(false); setConfirmBlock(true); }}
+                    className="w-full flex items-center gap-3 p-3.5 rounded-2xl hover:bg-destructive/10 text-left transition-colors group"
+                  >
+                    <div className="bg-destructive/10 group-hover:bg-destructive/20 p-2 rounded-xl transition-colors">
+                      {blocked ? <ShieldCheck className="h-4 w-4 text-destructive" /> : <ShieldOff className="h-4 w-4 text-destructive" />}
+                    </div>
+                    <span className="text-sm font-semibold text-destructive">{blocked ? 'Unblock User' : 'Block User'}</span>
+                  </button>
+                )}
               </div>
             </PopoverContent>
           </Popover>
@@ -479,7 +518,7 @@ export function ChatView({ chat, onBack, onCall, isBlocked, embedded = false }: 
       {/* Messages */}
       <div
         ref={scrollRef}
-        className="app-grid-lines flex flex-1 flex-col space-y-6 overflow-y-auto bg-transparent"
+        className="flex flex-1 flex-col space-y-1 overflow-y-auto bg-transparent px-2 pt-4 pb-2"
       >
         {messages.length === 0 && (
           <div className="m-auto flex flex-col items-center text-center">
@@ -503,7 +542,7 @@ export function ChatView({ chat, onBack, onCall, isBlocked, embedded = false }: 
             key={msg.id}
             ref={(el) => { messageRefs.current[msg.id] = el; }}
             className={cn(
-              "group flex max-w-[85%] flex-col animate-in rounded-[24px] transition-shadow duration-300 fade-in slide-in-from-bottom-2",
+              "group flex max-w-[85%] flex-col animate-in transition-shadow duration-300 fade-in slide-in-from-bottom-2",
               mine ? "ml-auto items-end" : "items-start",
               isSearchHit && !isCurrentHit && "ring-1 ring-accent/40"
             )}
@@ -561,8 +600,20 @@ export function ChatView({ chat, onBack, onCall, isBlocked, embedded = false }: 
               handleReact(msg, "❤️");
             }}
           >
-            <div className={cn("flex items-end gap-1", mine ? "flex-row-reverse" : "flex-row")}>
+            <div className={cn("flex items-end gap-2", mine ? "flex-row-reverse" : "flex-row")}>
+              {!mine && (
+                 <Avatar className="h-7 w-7 shrink-0">
+                   <AvatarImage src={chat.isGroup ? chat.participants?.find(p => p.uid === msg.senderId)?.avatar : chat.avatar} />
+                   <AvatarFallback>{(chat.isGroup ? chat.participants?.find(p => p.uid === msg.senderId)?.name : chat.name)?.substring(0, 2) || '?'}</AvatarFallback>
+                 </Avatar>
+              )}
               <div className="flex flex-col">
+                {/* Sender Name for Groups */}
+                {chat.isGroup && !mine && (
+                  <span className="text-[11px] text-muted-foreground ml-3 mb-1">
+                    {chat.participants?.find(p => p.uid === msg.senderId)?.name || 'Unknown'}
+                  </span>
+                )}
                 {/* Reply preview */}
                 {msg.replyTo && !msg.deleted && (
                   <button
@@ -580,13 +631,13 @@ export function ChatView({ chat, onBack, onCall, isBlocked, embedded = false }: 
                 )}
                 <div
                   className={cn(
-                    "overflow-hidden border text-sm leading-relaxed shadow-sm",
-                    msg.type === "image" || msg.type === "video" ? "rounded-[24px] p-1.5" : "rounded-[24px] px-4 py-3",
+                    "overflow-hidden text-[15px] leading-relaxed shadow-sm",
+                    msg.type === "image" || msg.type === "video" ? "rounded-[20px] p-1.5" : "px-3.5 py-2",
                     msg.deleted
-                      ? "border-dashed border-border/60 bg-transparent italic text-muted-foreground"
+                      ? "rounded-[20px] border border-dashed border-border/60 bg-transparent italic text-muted-foreground"
                       : mine
-                      ? "rounded-br-md border-primary/20 bg-gradient-to-br from-primary to-sky-500 text-primary-foreground shadow-lg shadow-primary/20"
-                      : "rounded-bl-md border-border/70 bg-card/92 text-foreground backdrop-blur-xl"
+                      ? "rounded-[20px] rounded-br-[4px] bg-[#0084ff] text-white"
+                      : "rounded-[20px] rounded-bl-[4px] bg-[#3E4042] text-[#E4E6EB]"
                   )}
                 >
                   {msg.deleted ? (
@@ -660,7 +711,7 @@ export function ChatView({ chat, onBack, onCall, isBlocked, embedded = false }: 
 
             {/* Reactions chips */}
             {Object.keys(reactionCounts).length > 0 && (
-              <div className={cn("-mt-1 flex flex-wrap gap-1", mine ? "justify-end" : "justify-start")}>
+              <div className={cn("-mt-1 flex flex-wrap gap-1", mine ? "justify-end" : "justify-start pl-9")}>
                 {Object.entries(reactionCounts).map(([e, count]) => {
                   const reactedByMe = user && msg.reactions?.[user.uid] === e;
                   return (
@@ -680,7 +731,7 @@ export function ChatView({ chat, onBack, onCall, isBlocked, embedded = false }: 
               </div>
             )}
 
-            <div className="flex items-center gap-1.5 mt-1 px-1">
+            <div className={cn("flex items-center gap-1.5 mt-1 px-1", !mine && "pl-9")}>
               <span className="text-[10px] text-muted-foreground">
                 {msg.createdAt?.toDate ? msg.createdAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Sending…'}
               </span>
@@ -741,9 +792,9 @@ export function ChatView({ chat, onBack, onCall, isBlocked, embedded = false }: 
         <div className={cn("flex items-end gap-2", embedded ? "mx-0" : "max-w-md mx-auto")}>
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="secondary" size="icon" className="h-11 w-11 shrink-0 rounded-full border-0 app-surface-muted" disabled={blocked || isUploading}>
-                {isUploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Plus className="h-5 w-5" />}
-              </Button>
+              <button disabled={blocked || isUploading} className="p-2 shrink-0 text-[#0084ff] hover:bg-white/10 rounded-full transition-colors">
+                {isUploading ? <Loader2 className="h-6 w-6 animate-spin" /> : <Plus className="h-6 w-6" />}
+              </button>
             </PopoverTrigger>
             <PopoverContent side="top" align="start" className="w-56 rounded-2xl border-none p-2 shadow-2xl app-surface">
               <div className="grid grid-cols-1 gap-1">
@@ -793,23 +844,23 @@ export function ChatView({ chat, onBack, onCall, isBlocked, embedded = false }: 
             onChange={(e) => { handleAttachmentSelected(e.target.files?.[0], "video"); e.target.value = ""; }}
           />
 
-          <div className="relative flex-1">
+          <div className="relative flex-1 flex items-center bg-[#3A3B3C] rounded-full px-1">
             <Input
               value={inputText}
               onChange={(e) => handleInputChange(e.target.value)}
               onKeyDown={handleKeyPress}
-              placeholder={blocked ? "You've blocked this user" : "Message..."}
+              placeholder={blocked ? "You've blocked this user" : "Aa"}
               disabled={blocked}
-              className="app-input min-h-[48px] rounded-[28px] border py-3 pr-11 focus-visible:ring-1 focus-visible:ring-primary"
+              className="flex-1 bg-transparent border-0 focus-visible:ring-0 text-[#E4E6EB] placeholder:text-[#B0B3B8] h-10 px-3 shadow-none focus-visible:ring-offset-0"
             />
             <Popover>
               <PopoverTrigger asChild>
                 <button
                   type="button"
                   disabled={blocked}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-primary disabled:opacity-50"
+                  className="p-2 text-[#0084ff] transition-colors hover:bg-white/10 rounded-full disabled:opacity-50"
                 >
-                  <Smile className="h-5 w-5" />
+                  <Smile className="h-6 w-6" />
                 </button>
               </PopoverTrigger>
               <PopoverContent side="top" align="end" className="w-72 rounded-2xl border-none p-3 shadow-2xl app-surface">
@@ -829,18 +880,13 @@ export function ChatView({ chat, onBack, onCall, isBlocked, embedded = false }: 
             </Popover>
           </div>
 
-          <Button
+          <button
             onClick={handleSend}
             disabled={!inputText.trim() || blocked}
-            className={cn(
-              "h-11 w-11 shrink-0 rounded-full p-0 shadow-lg transition-transform active:scale-95",
-              inputText.trim() && !blocked
-                ? "bg-gradient-to-br from-primary to-accent text-primary-foreground shadow-primary/30 hover:opacity-90"
-                : "bg-muted text-muted-foreground shadow-none"
-            )}
+            className="p-2 shrink-0 text-[#0084ff] transition-transform active:scale-95 disabled:opacity-50 hover:bg-white/10 rounded-full"
           >
-            <Send className="h-5 w-5 ml-0.5" />
-          </Button>
+            {inputText.trim() && !blocked ? <Send className="h-6 w-6" /> : <Smile className="h-6 w-6" />}
+          </button>
         </div>
       </div>
 
@@ -850,13 +896,13 @@ export function ChatView({ chat, onBack, onCall, isBlocked, embedded = false }: 
       <Sheet open={contactInfoOpen} onOpenChange={setContactInfoOpen}>
         <SheetContent side="right" className="w-full sm:max-w-md border-l border-border/70 bg-background/95 backdrop-blur-2xl p-0 overflow-y-auto [&>button]:hidden">
           <SheetHeader className="sr-only">
-            <SheetTitle>Profile Details</SheetTitle>
+            <SheetTitle>{chat.isGroup ? 'Group Details' : 'Profile Details'}</SheetTitle>
           </SheetHeader>
           <div className="flex items-center p-4">
             <Button variant="ghost" size="icon" onClick={() => setContactInfoOpen(false)} className="rounded-full mr-2">
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            <h2 className="text-lg font-bold mx-auto pr-10 font-headline">Profile Details</h2>
+            <h2 className="text-lg font-bold mx-auto pr-10 font-headline">{chat.isGroup ? 'Group Details' : 'Profile Details'}</h2>
           </div>
           <div className="p-6 pt-2">
             <div className="flex flex-col items-center text-center mb-8">
@@ -868,34 +914,38 @@ export function ChatView({ chat, onBack, onCall, isBlocked, embedded = false }: 
                 {chat.online && <div className="absolute bottom-2 right-1 h-5 w-5 rounded-full border-4 border-background bg-emerald-500" />}
               </div>
               <h4 className="text-2xl font-bold font-headline">{chat.name}</h4>
-              <p className="text-sm text-emerald-500 font-medium mt-1">
-                {blocked ? 'Blocked' : chat.online ? 'Active Now' : 'Offline'}
-              </p>
+              {!chat.isGroup && (
+                <p className="text-sm text-emerald-500 font-medium mt-1">
+                  {blocked ? 'Blocked' : chat.online ? 'Active Now' : 'Offline'}
+                </p>
+              )}
               <button className="mt-3 bg-muted/50 hover:bg-muted text-xl p-2.5 rounded-full transition-colors leading-none">
                 👋
               </button>
             </div>
             
             <div className="space-y-6">
-              <div>
-                <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2 px-2">Contact Information</h4>
-                <div className="bg-muted/10 border border-border/40 rounded-[24px] p-2 space-y-1">
-                  <div className="flex items-center gap-4 p-3 rounded-2xl hover:bg-muted/20 transition-colors">
-                    <Mail className="h-5 w-5 text-muted-foreground" />
-                    <div className="text-left min-w-0 flex-1">
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Email Address</p>
-                      <p className="text-sm font-medium truncate">{chat.email || "Hidden"}</p>
+              {!chat.isGroup && (
+                <div>
+                  <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2 px-2">Contact Information</h4>
+                  <div className="bg-muted/10 border border-border/40 rounded-[24px] p-2 space-y-1">
+                    <div className="flex items-center gap-4 p-3 rounded-2xl hover:bg-muted/20 transition-colors">
+                      <Mail className="h-5 w-5 text-muted-foreground" />
+                      <div className="text-left min-w-0 flex-1">
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Email Address</p>
+                        <p className="text-sm font-medium truncate">{chat.email || "Hidden"}</p>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-4 p-3 rounded-2xl hover:bg-muted/20 transition-colors">
-                    <MessageSquare className="h-5 w-5 text-muted-foreground" />
-                    <div className="text-left min-w-0 flex-1">
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Bio / Tagline</p>
-                      <p className="text-sm font-medium truncate">{chat.status || "Empty"}</p>
+                    <div className="flex items-center gap-4 p-3 rounded-2xl hover:bg-muted/20 transition-colors">
+                      <MessageSquare className="h-5 w-5 text-muted-foreground" />
+                      <div className="text-left min-w-0 flex-1">
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Bio / Tagline</p>
+                        <p className="text-sm font-medium truncate">{chat.status || "Empty"}</p>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
+              )}
 
               <div>
                 <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2 px-2">Quick Actions</h4>
@@ -907,27 +957,49 @@ export function ChatView({ chat, onBack, onCall, isBlocked, embedded = false }: 
                     </div>
                     <ChevronRight className="h-4 w-4 text-muted-foreground" />
                   </button>
-                  <button onClick={() => { setContactInfoOpen(false); setConfirmDelete(true); }} className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-destructive/10 transition-colors">
-                    <div className="flex items-center gap-3 text-destructive">
-                      <Trash2 className="h-5 w-5" />
-                      <span className="text-sm font-medium text-destructive">Clear Chat History</span>
-                    </div>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                  </button>
-                  <button onClick={() => { alert('Unfriend functionality coming soon'); }} className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-destructive/10 transition-colors">
-                    <div className="flex items-center gap-3 text-destructive">
-                      <UserMinus className="h-5 w-5" />
-                      <span className="text-sm font-medium text-destructive">Unfriend</span>
-                    </div>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                  </button>
-                  <button onClick={() => { setContactInfoOpen(false); setConfirmBlock(true); }} className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-destructive/10 transition-colors">
-                    <div className="flex items-center gap-3 text-destructive">
-                      <ShieldOff className="h-5 w-5" />
-                      <span className="text-sm font-medium text-destructive">{blocked ? 'Unblock User' : 'Block User'}</span>
-                    </div>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                  </button>
+                  {!chat.isGroup ? (
+                    <button onClick={() => { setContactInfoOpen(false); setConfirmDelete(true); }} className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-destructive/10 transition-colors">
+                      <div className="flex items-center gap-3 text-destructive">
+                        <Trash2 className="h-5 w-5" />
+                        <span className="text-sm font-medium text-destructive">Clear Chat History</span>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                  ) : chat.adminId === user?.uid ? (
+                    <button onClick={() => { setContactInfoOpen(false); setConfirmDeleteGroup(true); }} className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-destructive/10 transition-colors">
+                      <div className="flex items-center gap-3 text-destructive">
+                        <Trash2 className="h-5 w-5" />
+                        <span className="text-sm font-medium text-destructive">Delete Group</span>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                  ) : (
+                    <button onClick={() => { setContactInfoOpen(false); setConfirmLeave(true); }} className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-destructive/10 transition-colors">
+                      <div className="flex items-center gap-3 text-destructive">
+                        <LogOut className="h-5 w-5" />
+                        <span className="text-sm font-medium text-destructive">Leave Group</span>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                  )}
+                  {!chat.isGroup && (
+                    <>
+                      <button onClick={() => { alert('Unfriend functionality coming soon'); }} className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-destructive/10 transition-colors">
+                        <div className="flex items-center gap-3 text-destructive">
+                          <UserMinus className="h-5 w-5" />
+                          <span className="text-sm font-medium text-destructive">Unfriend</span>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      </button>
+                      <button onClick={() => { setContactInfoOpen(false); setConfirmBlock(true); }} className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-destructive/10 transition-colors">
+                        <div className="flex items-center gap-3 text-destructive">
+                          <ShieldOff className="h-5 w-5" />
+                          <span className="text-sm font-medium text-destructive">{blocked ? 'Unblock User' : 'Block User'}</span>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -966,6 +1038,42 @@ export function ChatView({ chat, onBack, onCall, isBlocked, embedded = false }: 
             <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteHistory} className="rounded-xl bg-destructive hover:bg-destructive/90">
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Group confirmation */}
+      <AlertDialog open={confirmDeleteGroup} onOpenChange={setConfirmDeleteGroup}>
+        <AlertDialogContent className="rounded-2xl max-w-xs">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Group?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the group and all its messages for everyone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { setConfirmDeleteGroup(false); onDeleteGroup?.(); }} className="rounded-xl bg-destructive hover:bg-destructive/90">
+              Delete Group
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Leave Group confirmation */}
+      <AlertDialog open={confirmLeave} onOpenChange={setConfirmLeave}>
+        <AlertDialogContent className="rounded-2xl max-w-xs">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Leave Group?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You will no longer receive messages from this group.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { setConfirmLeave(false); onLeaveGroup?.(); }} className="rounded-xl bg-destructive hover:bg-destructive/90">
+              Leave
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
