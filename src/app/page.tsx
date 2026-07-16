@@ -1377,6 +1377,7 @@ export default function MessengerApp() {
                     status: selectedPerson.status,
                     email: selectedPerson.email,
                     lastSeen: selectedPerson.lastSeen,
+                    quickEmoji: chats.find(c => c.id === activeChatId)?.quickEmoji,
                   }}
                   isBlocked={blockedUsers.includes(selectedPerson.uid)}
                   onBack={() => setSelectedOtherUid(null)}
@@ -1399,6 +1400,7 @@ export default function MessengerApp() {
                       avatar: directoryMap[p]?.photoURL || '',
                     })),
                     adminId: selectedGroupChat.adminId,
+                    quickEmoji: selectedGroupChat.quickEmoji,
                   }}
                   isBlocked={false}
                   onLeaveGroup={() => handleLeaveGroup(selectedGroupChat.id)}
