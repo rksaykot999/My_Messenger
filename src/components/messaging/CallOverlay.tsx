@@ -58,6 +58,24 @@ export function CallOverlay({
     }
   }, [localStream]);
 
+  const [hasRemoteVideo, setHasRemoteVideo] = useState(
+    () => type === 'video' && !!(remoteStream && remoteStream.getVideoTracks().length > 0)
+  );
+
+  useEffect(() => {
+    if (!remoteStream) return;
+    const checkVideo = () => {
+      setHasRemoteVideo(type === 'video' && remoteStream.getVideoTracks().length > 0);
+    };
+    checkVideo();
+    remoteStream.addEventListener('addtrack', checkVideo);
+    remoteStream.addEventListener('removetrack', checkVideo);
+    return () => {
+      remoteStream.removeEventListener('addtrack', checkVideo);
+      remoteStream.removeEventListener('removetrack', checkVideo);
+    };
+  }, [remoteStream, type]);
+
   useEffect(() => {
     if (remoteVideoRef.current && remoteStream) {
       remoteVideoRef.current.srcObject = remoteStream;
@@ -65,7 +83,7 @@ export function CallOverlay({
     if (remoteAudioRef.current && remoteStream) {
       remoteAudioRef.current.srcObject = remoteStream;
     }
-  }, [remoteStream]);
+  }, [remoteStream, hasRemoteVideo]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -85,7 +103,7 @@ export function CallOverlay({
     onToggleVideo?.(next);
   };
 
-  const hasRemoteVideo = type === 'video' && remoteStream && remoteStream.getVideoTracks().length > 0;
+  const hasVideoTrack = hasRemoteVideo; // alias for the state we added
 
   return (
     <div className="fixed inset-0 z-[100] flex flex-col bg-slate-900 text-white animate-in fade-in duration-500">

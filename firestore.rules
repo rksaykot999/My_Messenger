@@ -118,12 +118,16 @@ service cloud.firestore {
         allow create: if isSignedIn()
           && exists(/databases/$(database)/documents/chats/$(chatId))
           && request.auth.uid in chatParticipants();
+        // Senders can edit/delete their own messages.
         // Recipients need to flip a message's status to "delivered"/"read"
-        // (used for the double-checkmark receipts) without being able to
+        // (used for the double-checkmark receipts) and add reactions, without being able to
         // rewrite its text/sender.
         allow update: if isSignedIn()
           && request.auth.uid in chatParticipants()
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status"]);
+          && (
+            resource.data.senderId == request.auth.uid ||
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status", "readAt", "reactions"])
+          );
         allow delete: if isSignedIn() && request.auth.uid in chatParticipants();
       }
     }

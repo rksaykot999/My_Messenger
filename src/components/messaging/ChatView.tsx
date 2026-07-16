@@ -1,13 +1,20 @@
 "use client"
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { ArrowLeft, Phone, Video, Plus, Send, Image as ImageIcon, Camera, Film, Info, Trash2, ShieldOff, ShieldCheck, UserRound, Loader2, Mail, Smile, Reply, X, Search, ChevronUp, ChevronDown, MessageSquare, ChevronRight, UserMinus } from "lucide-react";
+import { ArrowLeft, Phone, Video, Plus, Send, Image as ImageIcon, Camera, Film, Info, Trash2, ShieldOff, ShieldCheck, UserRound, Loader2, Mail, Smile, Reply, X, Search, ChevronUp, ChevronDown, MessageSquare, ChevronRight, UserMinus, Download } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusIcon } from "./StatusIcon";
 import { cn } from "@/lib/utils";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger, PopoverClose } from "@/components/ui/popover";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogClose,
+} from "@/components/ui/dialog";
 import {
   Sheet,
   SheetContent,
@@ -83,12 +90,15 @@ export function ChatView({ chat, onBack, onCall, isBlocked, embedded = false }: 
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchIndex, setSearchIndex] = useState(0);
+  const [viewMedia, setViewMedia] = useState<{ url: string; type: "image" | "video" } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
   const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
   const videoInputRef = useRef<HTMLInputElement | null>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const swipeState = useRef<{ id: string | null; startX: number; startY: number; isSwiping: boolean }>({ id: null, startX: 0, startY: 0, isSwiping: false });
 
   // Set up (or create) the realtime chat and subscribe to its messages.
   useEffect(() => {
@@ -142,9 +152,17 @@ export function ChatView({ chat, onBack, onCall, isBlocked, embedded = false }: 
   }, [chatId, user, messages.length, settings.readReceipts]);
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
+    const scrollToBottom = () => {
+      if (bottomRef.current) {
+        bottomRef.current.scrollIntoView({ behavior: 'auto', block: 'end' });
+      } else if (scrollRef.current) {
+        scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      }
+    };
+    
+    scrollToBottom();
+    const timeoutId = setTimeout(scrollToBottom, 150);
+    return () => clearTimeout(timeoutId);
   }, [messages, otherTyping]);
 
   // Clear my typing flag when leaving the conversation.
@@ -461,10 +479,7 @@ export function ChatView({ chat, onBack, onCall, isBlocked, embedded = false }: 
       {/* Messages */}
       <div
         ref={scrollRef}
-        className={cn(
-          "app-grid-lines flex flex-1 flex-col space-y-6 overflow-y-auto scroll-smooth bg-transparent p-4 lg:p-5",
-          embedded ? "pb-32" : "pb-24"
-        )}
+        className="app-grid-lines flex flex-1 flex-col space-y-6 overflow-y-auto bg-transparent"
       >
         {messages.length === 0 && (
           <div className="m-auto flex flex-col items-center text-center">
@@ -492,6 +507,59 @@ export function ChatView({ chat, onBack, onCall, isBlocked, embedded = false }: 
               mine ? "ml-auto items-end" : "items-start",
               isSearchHit && !isCurrentHit && "ring-1 ring-accent/40"
             )}
+            onTouchStart={(e) => {
+              if (msg.deleted || blocked) return;
+              swipeState.current = { id: msg.id, startX: e.touches[0].clientX, startY: e.touches[0].clientY, isSwiping: false };
+            }}
+            onTouchMove={(e) => {
+              if (swipeState.current.id !== msg.id) return;
+              const deltaX = e.touches[0].clientX - swipeState.current.startX;
+              const deltaY = e.touches[0].clientY - swipeState.current.startY;
+              
+              if (!swipeState.current.isSwiping) {
+                if (Math.abs(deltaY) > Math.abs(deltaX)) {
+                  swipeState.current.id = null;
+                  return;
+                }
+                if (Math.abs(deltaX) > 5) {
+                  swipeState.current.isSwiping = true;
+                }
+              }
+              
+              if (swipeState.current.isSwiping) {
+                let moveX = deltaX;
+                if (mine && moveX > 0) moveX = 0;
+                if (!mine && moveX < 0) moveX = 0;
+                if (Math.abs(moveX) > 60) moveX = moveX > 0 ? 60 : -60;
+                
+                const el = messageRefs.current[msg.id];
+                if (el) {
+                  el.style.transition = 'none';
+                  el.style.transform = `translateX(${moveX}px)`;
+                }
+              }
+            }}
+            onTouchEnd={(e) => {
+              if (swipeState.current.id !== msg.id) return;
+              const deltaX = e.changedTouches[0].clientX - swipeState.current.startX;
+              
+              const el = messageRefs.current[msg.id];
+              if (el) {
+                el.style.transition = 'transform 0.2s ease-out';
+                el.style.transform = 'translateX(0)';
+              }
+              
+              if (swipeState.current.isSwiping && Math.abs(deltaX) > 40) {
+                if ((mine && deltaX < -40) || (!mine && deltaX > 40)) {
+                  setReplyTo(msg);
+                }
+              }
+              swipeState.current = { id: null, startX: 0, startY: 0, isSwiping: false };
+            }}
+            onDoubleClick={(e) => {
+              if (msg.deleted || blocked) return;
+              handleReact(msg, "❤️");
+            }}
           >
             <div className={cn("flex items-end gap-1", mine ? "flex-row-reverse" : "flex-row")}>
               <div className="flex flex-col">
@@ -524,12 +592,30 @@ export function ChatView({ chat, onBack, onCall, isBlocked, embedded = false }: 
                   {msg.deleted ? (
                     <span className="flex items-center gap-1.5"><ShieldOff className="h-3.5 w-3.5" /> This message was deleted</span>
                   ) : msg.type === "image" && msg.mediaURL ? (
-                    <a href={msg.mediaURL} target="_blank" rel="noopener noreferrer">
+                    <button onClick={() => setViewMedia({ url: msg.mediaURL!, type: "image" })}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={msg.mediaURL} alt="Shared photo" className="rounded-xl max-h-72 w-auto object-cover" />
-                    </a>
+                      <img 
+                        src={msg.mediaURL} 
+                        alt="Shared photo" 
+                        className="rounded-xl max-h-72 w-auto object-cover" 
+                        onLoad={() => {
+                          if (bottomRef.current) {
+                            bottomRef.current.scrollIntoView({ behavior: 'auto', block: 'end' });
+                          } else if (scrollRef.current) {
+                            scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+                          }
+                        }}
+                      />
+                    </button>
                   ) : msg.type === "video" && msg.mediaURL ? (
-                    <video src={msg.mediaURL} controls className="rounded-xl max-h-72 w-auto" />
+                    <button onClick={() => setViewMedia({ url: msg.mediaURL!, type: "video" })} className="relative flex items-center justify-center">
+                      <video src={msg.mediaURL} className="rounded-xl max-h-72 w-auto pointer-events-none" />
+                      <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/20 hover:bg-black/30 transition-colors">
+                        <div className="rounded-full bg-black/50 p-3 text-white backdrop-blur-md">
+                          <Film className="h-6 w-6" />
+                        </div>
+                      </div>
+                    </button>
                   ) : (
                     msg.text
                   )}
@@ -538,7 +624,7 @@ export function ChatView({ chat, onBack, onCall, isBlocked, embedded = false }: 
 
               {/* Hover actions: react + reply + delete */}
               {!msg.deleted && !blocked && (
-                <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                <div className="flex shrink-0 items-center gap-0.5 opacity-100 md:opacity-0 transition-opacity md:group-hover:opacity-100">
                   <Popover>
                     <PopoverTrigger asChild>
                       <button className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-primary">
@@ -548,13 +634,14 @@ export function ChatView({ chat, onBack, onCall, isBlocked, embedded = false }: 
                     <PopoverContent side="top" align={mine ? "end" : "start"} className="w-auto rounded-full border-none p-1.5 shadow-2xl app-surface">
                       <div className="flex items-center gap-1">
                         {REACTION_EMOJIS.map((e) => (
-                          <button
-                            key={e}
-                            onClick={() => handleReact(msg, e)}
-                            className="rounded-full p-1 text-lg transition-transform hover:scale-125"
-                          >
-                            {e}
-                          </button>
+                          <PopoverClose key={e} asChild>
+                            <button
+                              onClick={() => handleReact(msg, e)}
+                              className="rounded-full p-1 text-lg transition-transform hover:scale-125"
+                            >
+                              {e}
+                            </button>
+                          </PopoverClose>
                         ))}
                       </div>
                     </PopoverContent>
@@ -621,6 +708,9 @@ export function ChatView({ chat, onBack, onCall, isBlocked, embedded = false }: 
             </div>
           </div>
         )}
+
+        {/* Spacer to ensure the last message is visible above the absolute/fixed input area */}
+        <div ref={bottomRef} className={cn("w-full shrink-0 transition-all duration-300", replyTo ? "h-32" : "h-20")} />
       </div>
 
       {/* Input Area */}
@@ -657,18 +747,24 @@ export function ChatView({ chat, onBack, onCall, isBlocked, embedded = false }: 
             </PopoverTrigger>
             <PopoverContent side="top" align="start" className="w-56 rounded-2xl border-none p-2 shadow-2xl app-surface">
               <div className="grid grid-cols-1 gap-1">
-                <Button variant="ghost" className="justify-start gap-3 h-10" onClick={() => imageInputRef.current?.click()}>
-                  <ImageIcon className="h-4 w-4 text-blue-500" />
-                  <span className="text-sm">Gallery</span>
-                </Button>
-                <Button variant="ghost" className="justify-start gap-3 h-10" onClick={() => cameraInputRef.current?.click()}>
-                  <Camera className="h-4 w-4 text-orange-500" />
-                  <span className="text-sm">Camera</span>
-                </Button>
-                <Button variant="ghost" className="justify-start gap-3 h-10" onClick={() => videoInputRef.current?.click()}>
-                  <Film className="h-4 w-4 text-purple-500" />
-                  <span className="text-sm">Video</span>
-                </Button>
+                <PopoverClose asChild>
+                  <Button variant="ghost" className="justify-start gap-3 h-10" onClick={() => imageInputRef.current?.click()}>
+                    <ImageIcon className="h-4 w-4 text-blue-500" />
+                    <span className="text-sm">Gallery</span>
+                  </Button>
+                </PopoverClose>
+                <PopoverClose asChild>
+                  <Button variant="ghost" className="justify-start gap-3 h-10" onClick={() => cameraInputRef.current?.click()}>
+                    <Camera className="h-4 w-4 text-orange-500" />
+                    <span className="text-sm">Camera</span>
+                  </Button>
+                </PopoverClose>
+                <PopoverClose asChild>
+                  <Button variant="ghost" className="justify-start gap-3 h-10" onClick={() => videoInputRef.current?.click()}>
+                    <Film className="h-4 w-4 text-purple-500" />
+                    <span className="text-sm">Video</span>
+                  </Button>
+                </PopoverClose>
               </div>
             </PopoverContent>
           </Popover>
@@ -894,6 +990,41 @@ export function ChatView({ chat, onBack, onCall, isBlocked, embedded = false }: 
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Media Viewer */}
+      <Dialog open={!!viewMedia} onOpenChange={(open) => !open && setViewMedia(null)}>
+        <DialogContent className="max-w-4xl w-[95vw] h-[90vh] p-0 overflow-hidden bg-black/95 border-none flex flex-col rounded-[32px]">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Media Viewer</DialogTitle>
+          </DialogHeader>
+          <div className="absolute top-4 right-4 z-50 flex gap-2">
+             <Button variant="secondary" size="icon" className="rounded-full bg-white/20 hover:bg-white/40 text-white border-0" onClick={() => {
+                const a = document.createElement('a');
+                a.href = viewMedia?.url || '';
+                a.download = `media-${Date.now()}`;
+                a.target = '_blank';
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+             }}>
+               <Download className="h-5 w-5" />
+             </Button>
+             <DialogClose asChild>
+               <Button variant="secondary" size="icon" className="rounded-full bg-white/20 hover:bg-white/40 text-white border-0">
+                 <X className="h-5 w-5" />
+               </Button>
+             </DialogClose>
+          </div>
+          <div className="flex-1 flex items-center justify-center p-4">
+             {viewMedia?.type === "image" && (
+                <img src={viewMedia.url} className="max-w-full max-h-full object-contain rounded-xl" />
+             )}
+             {viewMedia?.type === "video" && (
+                <video src={viewMedia.url} controls autoPlay className="max-w-full max-h-full object-contain rounded-xl" />
+             )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

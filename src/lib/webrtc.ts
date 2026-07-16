@@ -56,9 +56,7 @@ export class CallSession {
     this.callId = callId || "";
 
     this.pc.ontrack = (event) => {
-      event.streams[0]?.getTracks().forEach((track) => {
-        this.remoteStream.addTrack(track);
-      });
+      this.remoteStream.addTrack(event.track);
     };
   }
 

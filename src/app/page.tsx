@@ -177,13 +177,14 @@ export default function MessengerApp() {
           avatar: other.photoURL,
           online: !!other.online,
           lastMessage: chat.lastMessage,
+          lastSenderId: chat.lastSenderId,
           time: timeAgo(chat.lastMessageAt),
           unread: chat.unread?.[user.uid] || 0,
         };
       })
       .filter(Boolean) as Array<{
         chatId: string; otherUid: string; name: string; avatar: string;
-        online: boolean; lastMessage: string; time: string; unread: number;
+        online: boolean; lastMessage: string; lastSenderId?: string; time: string; unread: number;
       }>;
   }, [chats, directoryMap, user]);
 
@@ -202,9 +203,24 @@ export default function MessengerApp() {
     (chatId) => {
       const chat = chats.find((c) => c.id === chatId);
       const otherUid = chat?.participants.find((p) => p !== user?.uid);
-      if (otherUid) setSelectedOtherUid(otherUid);
+      if (otherUid) {
+        if (isMobile && !selectedOtherUid) {
+          window.history.pushState({ chatOpen: true }, '');
+        }
+        setSelectedOtherUid(otherUid);
+      }
     }
   );
+
+  useEffect(() => {
+    const handlePopState = () => {
+      if (selectedOtherUid) {
+        setSelectedOtherUid(null);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [selectedOtherUid]);
 
   const filteredDirectory = directory.filter((d) =>
     d.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -255,6 +271,9 @@ export default function MessengerApp() {
 
   const openConversation = async (otherUid: string, chatId?: string) => {
     if (!user) return;
+    if (isMobile && !selectedOtherUid) {
+      window.history.pushState({ chatOpen: true }, '');
+    }
     setSelectedOtherUid(otherUid);
     setActiveTab('chats');
     if (chatId) {
@@ -511,7 +530,13 @@ export default function MessengerApp() {
           lastSeen: selectedPerson.lastSeen,
         }}
         isBlocked={blockedUsers.includes(selectedPerson.uid)}
-        onBack={() => setSelectedOtherUid(null)}
+        onBack={() => {
+          if (isMobile && window.history.state?.chatOpen) {
+            window.history.back();
+          } else {
+            setSelectedOtherUid(null);
+          }
+        }}
         onCall={(type) => callManager.startCall(
           { id: selectedPerson.uid, name: selectedPerson.name, avatar: selectedPerson.photoURL },
           type
@@ -1000,7 +1025,12 @@ export default function MessengerApp() {
                             </div>
                             <div className="flex items-center justify-between gap-3">
                               <p className={cn("truncate text-sm", chat.unread > 0 ? "font-semibold text-foreground" : "text-muted-foreground")}>
-                                {chat.lastMessage || 'Say hello 👋'}
+                                {chat.lastMessage ? (
+                                  <>
+                                    {chat.lastSenderId === user?.uid && <span className="font-medium">You: </span>}
+                                    {chat.lastMessage}
+                                  </>
+                                ) : 'Say hello 👋'}
                               </p>
                               {chat.unread > 0 && (
                                 <Badge className="h-5 min-w-5 rounded-full bg-primary p-0 px-1.5 text-[10px] text-primary-foreground">

@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import type { ChatSummary } from "@/lib/chat";
 import { showMessageNotification, requestNotificationPermission } from "@/lib/notifications";
+import { toast } from "@/hooks/use-toast";
 
 interface DirectoryLite {
   name: string;
@@ -53,13 +54,20 @@ export function useMessageNotifications(
       const otherUid = chat.participants.find((p) => p !== myUid);
       const other = otherUid ? directory[otherUid] : undefined;
 
-      showMessageNotification({
-        chatId: chat.id,
-        title: other?.name || "New message",
-        body: chat.lastMessage,
-        icon: other?.photoURL,
-        onClick: () => onOpenChat(chat.id),
-      });
+      if (document.visibilityState === "visible") {
+        toast({
+          title: other?.name || "New message",
+          description: chat.lastMessage,
+        });
+      } else {
+        showMessageNotification({
+          chatId: chat.id,
+          title: other?.name || "New message",
+          body: chat.lastMessage,
+          icon: other?.photoURL,
+          onClick: () => onOpenChat(chat.id),
+        });
+      }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chats, myUid, directory]);
