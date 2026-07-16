@@ -1,34 +1,52 @@
-# Walkthrough - Fixed Google Sign-In with Capawesome
+# Walkthrough - Native Notifications Setup
 
-I have corrected the implementation to use the `@capawesome/capacitor-google-sign-in` plugin and fixed the initialization logic.
+I have completed the technical setup for native notifications on Android. This includes permission handling, device registration (FCM tokens), and the background processing logic.
 
 ## Changes Made
 
-### 1. Correct Plugin Integration
-Updated [AuthContext.tsx](file:///G:/Personal Messenger by Google/Personal-Messenger-Web_App/src/contexts/AuthContext.tsx) to:
-- Use `GoogleSignIn` from `@capawesome/capacitor-google-sign-in`.
-- Initialize the plugin automatically on app load when running natively.
-- Handle the sign-in result which provides the `idToken` directly.
+### 1. Android Native Permissions
+Updated [AndroidManifest.xml](file:///G:/Personal Messenger by Google/Personal-Messenger-Web_App/android/app/src/main/AndroidManifest.xml) with:
+- `POST_NOTIFICATIONS`: Required for Android 13+.
+- `WAKE_LOCK`: To wake the device when a notification arrives.
+- `VIBRATE`: For tactile alerts.
 
-### 2. Configuration Cleanup
-Reverted the `plugins` section in [capacitor.config.ts](file:///G:/Personal Messenger by Google/Personal-Messenger-Web_App/capacitor.config.ts) since the Capawesome plugin is configured at runtime via code.
+### 2. Device Registration (FCM)
+Modified [AuthContext.tsx](file:///G:/Personal Messenger by Google/Personal-Messenger-Web_App/src/contexts/AuthContext.tsx):
+- Added logic to request push permissions and register the device with Firebase Cloud Messaging (FCM).
+- The `fcmToken` is now automatically saved to each user's document in Firestore (`/users/{uid}`).
 
-## Next Steps (CRITICAL)
+### 3. Native UI Alerts
+Updated [notifications.ts](file:///G:/Personal Messenger by Google/Personal-Messenger-Web_App/src/lib/notifications.ts):
+- Switched to `@capacitor/local-notifications` for native alerts when the app is in the background.
 
-Please follow these steps exactly:
+### 4. Background Push Logic (Cloud Functions)
+Created a new [functions](file:///G:/Personal Messenger by Google/Personal-Messenger-Web_App/functions) directory:
+- [index.js](file:///G:/Personal Messenger by Google/Personal-Messenger-Web_App/functions/index.js): Contains Firestore triggers that send push notifications whenever a new message or call is detected.
 
-### 1. Go to the Project Root
-Your terminal is currently in the `android` folder. Move up one level:
-```powershell
-cd ..
-```
+## Final Steps (Action Required)
 
-### 2. Install the CORRECT Plugin
-Run this command from the **root** folder (`Personal-Messenger-Web_App`):
-```powershell
-npm install @capawesome/capacitor-google-sign-in
+To finalize the setup, you MUST perform these steps in your terminal:
+
+### 1. Install New Dependencies
+Run this in the **project root**:
+```bash
+npm install @capacitor/push-notifications @capacitor/local-notifications
 npx cap sync android
 ```
 
-### 3. Verify SHA-1
-Ensure your SHA-1 is in the Firebase Console as mentioned previously. If you don't do this, you will see a "Developer Error" (Error Code 10).
+### 2. Set Up Cloud Functions
+If you haven't initialized Firebase Functions yet, run this in the **project root**:
+```bash
+firebase init functions
+```
+(When asked, use **JavaScript** and do **not** overwrite the files I created).
+
+### 3. Deploy Notifications
+Deploy the push notification logic to your Firebase project:
+```bash
+cd functions
+npm install
+firebase deploy --only functions
+```
+
+Once deployed, your app will be able to receive notifications even when it is completely closed!

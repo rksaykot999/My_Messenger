@@ -1,32 +1,50 @@
-# Fix Google Sign-In for Capacitor Android (Revised)
+# Implementation Plan - Native Push Notifications for Android
 
-The previous attempt failed because of an incorrect package name and being run in the wrong directory. We are switching to `@capawesome/capacitor-google-sign-in`, which is the current industry standard for Google Sign-In in Capacitor.
+The app currently uses the Web Notification API, which is not supported in the Android WebView for Capacitor apps. To fix notifications for messages and calls, we need to integrate native Capacitor plugins and set up a Firebase Cloud Messaging (FCM) workflow.
 
 ## User Review Required
 
 > [!IMPORTANT]
-> You MUST run the installation commands in the **Project Root** directory, NOT the `android` folder.
-
-> [!IMPORTANT]
-> This change requires adding the dependency `@capawesome/capacitor-google-sign-in`.
+> **Dependencies**: You must run `npm install @capacitor/push-notifications @capacitor/local-notifications` in the project root.
+> **Backend**: For notifications to work when the app is **closed**, a server-side component (Firebase Cloud Functions) is required to "push" the message to the device. I will provide the code for this, but it requires deployment to your Firebase project.
 
 ## Proposed Changes
 
-### [Component] Authentication Logic
+### 1. Android Native Configuration
+
+#### [MODIFY] [AndroidManifest.xml](file:///G:/Personal Messenger by Google/Personal-Messenger-Web_App/android/app/src/main/AndroidManifest.xml)
+- Add `<uses-permission android:name="android.permission.WAKE_LOCK" />`
+- Add `<uses-permission android:name="android.permission.VIBRATE" />`
+- Add permission for POST_NOTIFICATIONS (for Android 13+).
+
+### 2. Authentication & FCM Token Management
 
 #### [MODIFY] [AuthContext.tsx](file:///G:/Personal Messenger by Google/Personal-Messenger-Web_App/src/contexts/AuthContext.tsx)
-- Switch to `@capawesome/capacitor-google-sign-in`.
-- Added initialization logic in `useEffect` using the Web Client ID.
-- Updated `loginWithGoogle` to use the correct `signIn()` method and response structure.
+- Integrate `@capacitor/push-notifications`.
+- Create a `registerPushNotifications()` function.
+- Save the generated FCM token to the user's Firestore document (`/users/{uid}/fcmToken`).
 
-### [Component] Capacitor Configuration
+### 3. Native Notification Handling
 
-#### [MODIFY] [capacitor.config.ts](file:///G:/Personal Messenger by Google/Personal-Messenger-Web_App/capacitor.config.ts)
-- Cleaned up the `plugins` section as this plugin is configured at runtime.
+#### [MODIFY] [notifications.ts](file:///G:/Personal Messenger by Google/Personal-Messenger-Web_App/src/lib/notifications.ts)
+- Update `showMessageNotification` to use `@capacitor/local-notifications` when `Capacitor.isNativePlatform()` is true.
+- This ensures that if the app is open (backgrounded), the notification will show natively.
+
+### 4. Background Messaging (Cloud Functions)
+
+#### [NEW] `functions/index.js`
+- Create a Firestore trigger for `chats/{chatId}/messages/{messageId}`.
+- Create a Firestore trigger for `calls/{callId}`.
+- Use `firebase-admin` to send push notifications to the `fcmToken` stored in the recipient's user document.
 
 ## Verification Plan
 
+### Automated Tests
+- N/A (Manual verification on device required for push notifications).
+
 ### Manual Verification
-1.  Navigate to the project root in your terminal.
-2.  Run the installation commands.
-3.  Deploy to Android and test the sign-in flow.
+1. Install plugins and sync Android.
+2. Open the app on an Android device.
+3. Verify that the "Allow notifications" permission prompt appears.
+4. Send a message from another account.
+5. Verify a notification appears when the app is in the background.

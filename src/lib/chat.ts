@@ -48,6 +48,7 @@ export interface ChatSummary {
   groupName?: string;
   groupAvatar?: string;
   adminId?: string;
+  quickEmoji?: string;
 }
 
 export interface DirectoryUser {
@@ -258,6 +259,11 @@ export async function markChatRead(chatId: string, uid: string) {
   try {
     await updateDoc(doc(db, "chats", chatId), { [`unread.${uid}`]: 0 });
   } catch {}
+}
+
+/** Sets the quick message emoji for a chat */
+export async function setQuickEmoji(chatId: string, emoji: string) {
+  await updateDoc(doc(db, "chats", chatId), { quickEmoji: emoji });
 }
 
 /** Toggles an emoji reaction from `uid` on a single message. */

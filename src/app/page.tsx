@@ -186,6 +186,7 @@ export default function MessengerApp() {
             time: timeAgo(chat.lastMessageAt),
             unread: chat.unread?.[user.uid] || 0,
             participants: chat.participants,
+            quickEmoji: chat.quickEmoji,
           };
         }
 
@@ -203,12 +204,13 @@ export default function MessengerApp() {
           lastSenderId: chat.lastSenderId,
           time: timeAgo(chat.lastMessageAt),
           unread: chat.unread?.[user.uid] || 0,
+          quickEmoji: chat.quickEmoji,
         };
       })
       .filter(Boolean) as Array<{
         chatId: string; otherUid?: string; isGroup?: boolean; name: string; avatar: string;
         online: boolean; lastMessage: string; lastSenderId?: string; time: string; unread: number;
-        participants?: string[];
+        participants?: string[]; quickEmoji?: string;
       }>;
   }, [chats, directoryMap, user]);
 
@@ -602,6 +604,7 @@ export default function MessengerApp() {
           status: selectedPerson.status,
           email: selectedPerson.email,
           lastSeen: selectedPerson.lastSeen,
+          quickEmoji: chats.find(c => c.id === activeChatId)?.quickEmoji,
         }}
         isBlocked={blockedUsers.includes(selectedPerson.uid)}
         onBack={() => {
@@ -631,6 +634,7 @@ export default function MessengerApp() {
             avatar: directoryMap[p]?.photoURL || '',
           })),
           adminId: selectedGroupChat.adminId,
+          quickEmoji: selectedGroupChat.quickEmoji,
         }}
         isBlocked={false}
         onLeaveGroup={() => handleLeaveGroup(selectedGroupChat.id)}

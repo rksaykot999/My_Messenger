@@ -1,5 +1,8 @@
 "use client";
 
+import { Capacitor } from "@capacitor/core";
+import { LocalNotifications } from "@capacitor/local-notifications";
+
 // Keeps a live reference to open Notification objects, keyed by chatId,
 // so we can auto-dismiss them from the notification tray the moment the
 // user opens that conversation (mirrors how phone apps clear a notification
@@ -7,6 +10,10 @@
 const openNotifications = new Map<string, Notification>();
 
 export async function requestNotificationPermission() {
+  if (Capacitor.isNativePlatform()) {
+    const perm = await LocalNotifications.requestPermissions();
+    return perm.display === "granted";
+  }
   if (typeof window === "undefined" || !("Notification" in window)) return false;
   if (Notification.permission === "granted") return true;
   if (Notification.permission === "denied") return false;
@@ -21,6 +28,20 @@ export function showMessageNotification(opts: {
   icon?: string;
   onClick?: () => void;
 }) {
+  if (Capacitor.isNativePlatform()) {
+    LocalNotifications.schedule({
+      notifications: [
+        {
+          title: opts.title,
+          body: opts.body,
+          id: Math.floor(Math.random() * 100000),
+          extra: { chatId: opts.chatId },
+        },
+      ],
+    });
+    return;
+  }
+
   if (typeof window === "undefined" || !("Notification" in window)) return;
   if (Notification.permission !== "granted") return;
   if (document.visibilityState === "visible") return; // already looking at the app

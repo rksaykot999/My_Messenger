@@ -23,6 +23,7 @@ import {
 } from "firebase/auth";
 import { Capacitor } from "@capacitor/core";
 import { GoogleSignIn } from "@capawesome/capacitor-google-sign-in";
+import { PushNotifications } from "@capacitor/push-notifications";
 import {
   arrayRemove,
   collection,
@@ -69,6 +70,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const registerPush = async (uid: string) => {
+      if (!Capacitor.isNativePlatform()) return;
+
+      try {
+        let perm = await PushNotifications.checkPermissions();
+        if (perm.receive === "prompt") {
+          perm = await PushNotifications.requestPermissions();
+        }
+        if (perm.receive !== "granted") return;
+
+        await PushNotifications.register();
+
+        PushNotifications.addListener("registration", async (token) => {
+          await updateDoc(doc(db, "users", uid), {
+            fcmToken: token.value,
+          });
+        });
+      } catch (e) {
+        console.error("Push registration error:", e);
+      }
+    };
+
     if (Capacitor.isNativePlatform()) {
       GoogleSignIn.initialize({
         clientId: "1038574226468-okpbrd9mbo9sl5bh6icsvf2344dpb2sf.apps.googleusercontent.com",
@@ -85,6 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       unsubProfile = undefined;
 
       if (firebaseUser) {
+        registerPush(firebaseUser.uid);
         // Paint something immediately from the auth record while the
         // Firestore doc loads / in case Firestore is briefly unreachable.
         setProfile({

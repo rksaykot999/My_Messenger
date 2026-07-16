@@ -48,6 +48,7 @@ import {
   subscribeChatDoc,
   toggleReaction,
   deleteMessageForEveryone,
+  setQuickEmoji,
   formatLastSeen,
   type ChatMessage,
 } from "@/lib/chat";
@@ -67,6 +68,7 @@ interface ChatViewProps {
     isGroup?: boolean;
     participants?: { uid: string; name: string; avatar: string }[];
     adminId?: string;
+    quickEmoji?: string;
   };
   isBlocked?: boolean;
   onBack?: () => void;
@@ -278,6 +280,43 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
     }
   };
 
+  const handleChangeQuickEmoji = async (emoji: string) => {
+    if (!user || blocked) return;
+    let id = chatId;
+    if (!id) {
+      try {
+        id = await ensureChat(user.uid, chat.id);
+        setChatId(id);
+      } catch (err) {
+        console.error("Failed to initialize chat for quick emoji", err);
+        return;
+      }
+    }
+    try {
+      await setQuickEmoji(id, emoji);
+    } catch (err) {
+      console.error("Failed to change quick emoji", err);
+    }
+  };
+
+  const handleSendQuickEmoji = async () => {
+    if (!user || blocked) return;
+    let id = chatId;
+    if (!id) {
+      try {
+        id = await ensureChat(user.uid, chat.id);
+        setChatId(id);
+      } catch (err) {
+        return;
+      }
+    }
+    try {
+      await sendMessage(id, user.uid, chat.quickEmoji || "👍");
+    } catch (err) {
+      console.error("Failed to send quick emoji", err);
+    }
+  };
+
   const handleDeleteHistory = async () => {
     if (!chatId) return;
     await deleteChatHistory(chatId);
@@ -423,6 +462,30 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
                   <div className="bg-muted p-2 rounded-xl"><UserRound className="h-4 w-4" /></div>
                   <span className="text-sm font-semibold">{chat.isGroup ? 'View Group Info' : 'View Contact Info'}</span>
                 </button>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button className="w-full flex items-center gap-3 p-3.5 rounded-2xl border border-border/50 hover:bg-muted/50 text-left transition-colors">
+                      <div className="bg-muted p-2 rounded-xl flex items-center justify-center h-8 w-8 text-lg leading-none">{chat.quickEmoji || "👍"}</div>
+                      <span className="text-sm font-semibold">Change Quick Emoji</span>
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent side="left" align="start" className="w-72 rounded-2xl border-none p-3 shadow-2xl app-surface">
+                     <div className="mb-2 text-xs font-semibold text-muted-foreground px-1">Quick Message</div>
+                     <div className="grid grid-cols-8 gap-1">
+                        {PICKER_EMOJIS.map((e) => (
+                          <PopoverClose key={e} asChild>
+                            <button
+                              type="button"
+                              onClick={() => { setInfoOpen(false); handleChangeQuickEmoji(e); }}
+                              className="rounded-lg p-1 text-xl transition-transform hover:scale-125 hover:bg-muted"
+                            >
+                              {e}
+                            </button>
+                          </PopoverClose>
+                        ))}
+                     </div>
+                  </PopoverContent>
+                </Popover>
                 {!chat.isGroup ? (
                   <button
                     onClick={() => { setInfoOpen(false); setConfirmDelete(true); }}
@@ -880,13 +943,22 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
             </Popover>
           </div>
 
-          <button
-            onClick={handleSend}
-            disabled={!inputText.trim() || blocked}
-            className="p-2 shrink-0 text-[#0084ff] transition-transform active:scale-95 disabled:opacity-50 hover:bg-white/10 rounded-full"
-          >
-            {inputText.trim() && !blocked ? <Send className="h-6 w-6" /> : <Smile className="h-6 w-6" />}
-          </button>
+          {inputText.trim() && !blocked ? (
+            <button
+              onClick={handleSend}
+              className="p-2 shrink-0 text-[#0084ff] transition-transform active:scale-95 hover:bg-white/10 rounded-full"
+            >
+              <Send className="h-6 w-6" />
+            </button>
+          ) : (
+            <button
+              onClick={handleSendQuickEmoji}
+              disabled={blocked}
+              className="p-2 shrink-0 text-[#0084ff] transition-transform active:scale-95 disabled:opacity-50 hover:bg-white/10 rounded-full flex items-center justify-center"
+            >
+               <span className="text-2xl leading-none mb-0.5">{chat.quickEmoji || "👍"}</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -957,6 +1029,33 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
                     </div>
                     <ChevronRight className="h-4 w-4 text-muted-foreground" />
                   </button>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-muted/20 transition-colors">
+                        <div className="flex items-center gap-3 text-primary">
+                          <div className="flex items-center justify-center w-5 h-5 text-xl leading-none">{chat.quickEmoji || "👍"}</div>
+                          <span className="text-sm font-medium">Change Quick Emoji</span>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent side="top" align="center" className="w-72 rounded-2xl border-none p-3 shadow-2xl app-surface z-[100]">
+                       <div className="mb-2 text-xs font-semibold text-muted-foreground px-1">Quick Message</div>
+                       <div className="grid grid-cols-8 gap-1">
+                          {PICKER_EMOJIS.map((e) => (
+                            <PopoverClose key={e} asChild>
+                              <button
+                                type="button"
+                                onClick={() => { setContactInfoOpen(false); handleChangeQuickEmoji(e); }}
+                                className="rounded-lg p-1 text-xl transition-transform hover:scale-125 hover:bg-muted"
+                              >
+                                {e}
+                              </button>
+                            </PopoverClose>
+                          ))}
+                       </div>
+                    </PopoverContent>
+                  </Popover>
                   {!chat.isGroup ? (
                     <button onClick={() => { setContactInfoOpen(false); setConfirmDelete(true); }} className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-destructive/10 transition-colors">
                       <div className="flex items-center gap-3 text-destructive">
