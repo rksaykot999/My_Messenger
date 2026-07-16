@@ -1,0 +1,4 @@
+- [x] Update `capacitor.config.ts` with Google Auth configuration
+- [x] Update `AuthContext.tsx` to handle native Google Sign-In
+- [x] Fix incorrect plugin imports in `AuthContext.tsx`
+- [ ] Verify build and sync process with user

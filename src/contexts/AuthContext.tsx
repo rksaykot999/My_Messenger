@@ -19,7 +19,10 @@ import {
   deleteUser,
   sendPasswordResetEmail,
   User,
+  signInWithCredential,
 } from "firebase/auth";
+import { Capacitor } from "@capacitor/core";
+import { GoogleSignIn } from "@capawesome/capacitor-google-sign-in";
 import {
   arrayRemove,
   collection,
@@ -66,6 +69,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (Capacitor.isNativePlatform()) {
+      GoogleSignIn.initialize({
+        clientId: "1038574226468-okpbrd9mbo9sl5bh6icsvf2344dpb2sf.apps.googleusercontent.com",
+      });
+    }
+
     let unsubProfile: (() => void) | undefined;
 
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -213,6 +222,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const loginWithGoogle = async () => {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const result = await GoogleSignIn.signIn();
+        const credential = GoogleAuthProvider.credential(result.idToken);
+        await signInWithCredential(auth, credential);
+      } catch (error: any) {
+        console.error("Native Google Sign-In error:", error);
+        throw error;
+      }
+      return;
+    }
+
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: "select_account" });
     try {
