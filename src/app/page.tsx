@@ -157,6 +157,37 @@ export default function MessengerApp() {
     };
   }, [user]);
 
+  // Handle Android/Web back button to close sub-screens instead of exiting app
+  const isSubScreenActive = !!(
+    selectedOtherUid || 
+    selectedGroupId || 
+    isCreateGroupOpen || 
+    chatSearchOpen || 
+    settingsView !== 'main'
+  );
+
+  useEffect(() => {
+    if (isSubScreenActive) {
+      if (!window.history.state?.internal) {
+        window.history.pushState({ internal: true }, '');
+      }
+    } else if (window.history.state?.internal) {
+      window.history.back();
+    }
+  }, [isSubScreenActive]);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setSelectedOtherUid(null);
+      setSelectedGroupId(null);
+      setIsCreateGroupOpen(false);
+      setChatSearchOpen(false);
+      setSettingsView('main');
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   const directoryMap = useMemo(() => {
     const map: Record<string, DirectoryUser> = {};
     directory.forEach((d) => (map[d.uid] = d));
