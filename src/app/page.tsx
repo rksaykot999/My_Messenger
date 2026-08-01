@@ -77,7 +77,7 @@ function timeAgo(ts: any) {
 export default function MessengerApp() {
   const router = useRouter();
   const { toast } = useToast();
-  const { user, profile, loading, logout, deleteAccount, login, loginWithGoogle, finishDeleteAccount, sendPasswordReset } = useAuth();
+  const { user, profile, loading, logout, deleteAccount, login, loginWithGoogle, finishDeleteAccount, sendPasswordReset, registerPushNotifications } = useAuth();
   const { settings, updateSettings } = useSettings();
   const isMobile = useIsMobile();
 
@@ -98,6 +98,17 @@ export default function MessengerApp() {
   const [chatSearchOpen, setChatSearchOpen] = useState(false);
   const [chatSearchQuery, setChatSearchQuery] = useState('');
   const [chatFilter, setChatFilter] = useState<'all' | 'unread' | 'online'>('all');
+
+  const [showNotificationBanner, setShowNotificationBanner] = useState(false);
+  const [isPushRegistering, setIsPushRegistering] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && "Notification" in window) {
+      if (Notification.permission === "default") {
+        setShowNotificationBanner(true);
+      }
+    }
+  }, []);
   const [locked, setLocked] = useState(false);
 
   const [settingsView, setSettingsView] = useState<SettingsView>('main');
@@ -1129,6 +1140,48 @@ export default function MessengerApp() {
                       </Button>
                     </div>
                   )}
+
+                  {/* Notification Permission Banner */}
+                  {showNotificationBanner && !chatSearchQuery && (
+                    <div className="app-surface-muted flex flex-col sm:flex-row items-start sm:items-center justify-between rounded-[24px] p-4 border border-blue-500/30 bg-blue-500/5 gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-500/20 text-blue-500">
+                          <Bell className="h-5 w-5 animate-pulse" />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-semibold">Enable Notifications</h4>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            Get alerts for messages & calls in the background.
+                          </p>
+                        </div>
+                      </div>
+                      <Button 
+                        size="sm" 
+                        className="w-full sm:w-auto rounded-full bg-blue-500 hover:bg-blue-600 text-white font-semibold" 
+                        disabled={isPushRegistering}
+                        onClick={async () => {
+                          setIsPushRegistering(true);
+                          try {
+                            const permission = await Notification.requestPermission();
+                            if (permission === 'granted') {
+                              setShowNotificationBanner(false);
+                              await registerPushNotifications();
+                              toast({ title: 'Notifications Enabled', description: 'You will now receive alerts in the background.' });
+                            } else {
+                              setShowNotificationBanner(false);
+                            }
+                          } catch (error) {
+                            console.error(error);
+                          } finally {
+                            setIsPushRegistering(false);
+                          }
+                        }}
+                      >
+                        {isPushRegistering ? 'Enabling...' : 'Enable'}
+                      </Button>
+                    </div>
+                  )}
+
 
                   {/* Active Now - Horizontal Scroll */}
                   {onlineFriends.length > 0 && !chatSearchQuery && (
