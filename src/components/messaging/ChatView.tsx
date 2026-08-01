@@ -88,7 +88,7 @@ const PICKER_EMOJIS = ["😀","😁","😂","🤣","😊","😍","😘","😎","
 // probably closed the tab without clearing it).
 const TYPING_TTL_MS = 6000;
 
-export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, isBlocked, embedded = false }: ChatViewProps) {
+export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, isBlocked, amIBlocked, isFriend, embedded = false }: ChatViewProps) {
   const { user } = useAuth();
   const { settings } = useSettings();
   const { toast } = useToast();
