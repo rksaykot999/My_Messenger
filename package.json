@@ -48,6 +48,7 @@
     "firebase": "^11.10.0",
     "genkit": "^1.28.0",
     "jose": "^6.2.6",
+    "jspdf": "^4.2.1",
     "lucide-react": "^0.475.0",
     "next": "15.5.9",
     "patch-package": "^8.0.0",

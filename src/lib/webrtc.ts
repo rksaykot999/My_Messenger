@@ -11,6 +11,7 @@ import {
   serverTimestamp,
   query,
   where,
+  writeBatch,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
@@ -296,4 +297,20 @@ export function subscribeCallHistory(
     unsub1();
     unsub2();
   };
+}
+
+export async function clearCallHistory(uid: string) {
+  const callerQ = query(collection(db, "calls"), where("callerId", "==", uid));
+  const calleeQ = query(collection(db, "calls"), where("calleeId", "==", uid));
+
+  const [callerSnap, calleeSnap] = await Promise.all([
+    getDocs(callerQ),
+    getDocs(calleeQ)
+  ]);
+
+  const batch = writeBatch(db);
+  callerSnap.docs.forEach(d => batch.delete(d.ref));
+  calleeSnap.docs.forEach(d => batch.delete(d.ref));
+
+  await batch.commit();
 }

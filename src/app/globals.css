@@ -58,6 +58,33 @@
   * {
     @apply border-border;
   }
+  
+  html[data-font-size="small"] {
+    font-size: 14px;
+  }
+  html[data-font-size="medium"] {
+    font-size: 16px;
+  }
+  html[data-font-size="large"] {
+    font-size: 18px;
+  }
+  
+  html[data-font-family="system"] {
+    --font-body: system-ui, -apple-system, sans-serif;
+  }
+  html[data-font-family="inter"] {
+    --font-body: 'Inter', sans-serif;
+  }
+  html[data-font-family="roboto"] {
+    --font-body: 'Roboto', sans-serif;
+  }
+  html[data-font-family="serif"] {
+    --font-body: 'Playfair Display', serif;
+  }
+  html[data-font-family="mono"] {
+    --font-body: 'Fira Code', monospace;
+  }
+  
   html {
     color-scheme: light;
   }
@@ -66,6 +93,7 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-body, 'Inter', sans-serif);
     background-image:
       radial-gradient(circle at top left, hsl(var(--primary) / 0.08), transparent 28%),
       radial-gradient(circle at top right, hsl(var(--accent) / 0.07), transparent 26%),

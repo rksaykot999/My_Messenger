@@ -9,7 +9,7 @@ import {
   useState,
   ReactNode,
 } from "react";
-import { doc, onSnapshot, setDoc } from "firebase/firestore";
+import { doc, onSnapshot, setDoc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -22,9 +22,11 @@ export interface AppSettings {
   readReceipts: boolean;
   typingIndicator: boolean;
   language: string;
-  appLockEnabled: boolean;
-  appLockPinHash: string | null;
+  appLockType: "none" | "pin" | "password" | "pattern";
+  appLockHash: string | null;
   accountMode: "public" | "private";
+  fontSize: "small" | "medium" | "large";
+  fontFamily: "system" | "inter" | "roboto" | "serif" | "mono";
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -34,9 +36,11 @@ const DEFAULT_SETTINGS: AppSettings = {
   readReceipts: true,
   typingIndicator: true,
   language: "English (US)",
-  appLockEnabled: false,
-  appLockPinHash: null,
+  appLockType: "none",
+  appLockHash: null,
   accountMode: "public",
+  fontSize: "medium",
+  fontFamily: "system",
 };
 
 const LOCAL_KEY = "my-messenger:settings";
@@ -54,7 +58,15 @@ function readLocalSettings(): AppSettings {
   try {
     const raw = window.localStorage.getItem(LOCAL_KEY);
     if (!raw) return DEFAULT_SETTINGS;
-    return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
+    const parsed = JSON.parse(raw);
+    
+    // Migration: if the old appLockEnabled is true but no type is set, default to "pin"
+    if (parsed.appLockEnabled && !parsed.appLockType) {
+      parsed.appLockType = "pin";
+      parsed.appLockHash = parsed.appLockPinHash || null;
+    }
+    
+    return { ...DEFAULT_SETTINGS, ...parsed };
   } catch {
     return DEFAULT_SETTINGS;
   }
@@ -90,7 +102,14 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       ref,
       (snap) => {
         if (snap.exists()) {
-          const merged = { ...DEFAULT_SETTINGS, ...(snap.data() as Partial<AppSettings>) };
+          const parsed = snap.data() as Partial<AppSettings> & { appLockEnabled?: boolean, appLockPinHash?: string | null };
+          
+          if (parsed.appLockEnabled && !parsed.appLockType) {
+            parsed.appLockType = "pin";
+            parsed.appLockHash = parsed.appLockPinHash || null;
+          }
+          
+          const merged = { ...DEFAULT_SETTINGS, ...parsed };
           setSettings(merged);
           applyThemeClass(merged.theme);
           window.localStorage.setItem(LOCAL_KEY, JSON.stringify(merged));
@@ -130,16 +149,22 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       if (patch.theme) {
         applyThemeClass(patch.theme);
       }
+      if (patch.fontSize) {
+        document.documentElement.setAttribute('data-font-size', patch.fontSize);
+      }
+      if (patch.fontFamily) {
+        document.documentElement.setAttribute('data-font-family', patch.fontFamily);
+      }
       
       if (user) {
         const ref = doc(db, "users", user.uid, "private", "settings");
-        setDoc(ref, patch, { merge: true }).catch((e) => console.error("setDoc settings error:", e));
+        setDoc(ref, patch, { merge: true }).catch((e: any) => console.error("setDoc settings error:", e));
 
         // If accountMode is changed, sync it to the main user profile for discovery filtering
         if (patch.accountMode) {
           updateDoc(doc(db, "users", user.uid), {
             accountMode: patch.accountMode,
-          }).catch((e) => console.error("updateDoc accountMode error:", e));
+          }).catch((e: any) => console.error("updateDoc accountMode error:", e));
         }
       }
     },

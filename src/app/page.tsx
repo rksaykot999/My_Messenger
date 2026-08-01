@@ -14,16 +14,18 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
   Search, Phone, Video, Shield, Bell, Lock, Palette, TextQuote,
-  Smartphone, Eye, ChevronLeft, LogOut, Plus, PhoneMissed, PhoneIncoming, PhoneOutgoing, Loader2,
-  Check, X, Download, KeyRound, MessageSquare, Users, UserCog,
+  Smartphone, Eye, ChevronLeft, ChevronDown, LogOut, Plus, PhoneMissed, PhoneIncoming, PhoneOutgoing, Loader2,
+  Check, X, Download, KeyRound, MessageSquare, Users, UserCog, Code, Globe, Trash2
 } from "lucide-react";
 import { ChatView } from "@/components/messaging/ChatView";
 import { CallOverlay } from "@/components/messaging/CallOverlay";
 import Image from "next/image";
 import AppLogo from "./app logo.svg";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 import { AppLockScreen, sha256 } from "@/components/messaging/AppLockScreen";
+import { PatternLock } from "@/components/messaging/PatternLock";
 import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -41,7 +43,7 @@ import {
   type ChatSummary,
   type DirectoryUser,
 } from "@/lib/chat";
-import { subscribeCallHistory, type CallDoc } from "@/lib/webrtc";
+import { subscribeCallHistory, clearCallHistory, type CallDoc } from "@/lib/webrtc";
 import { useCallManager } from "@/hooks/use-call-manager";
 import { useMessageNotifications } from "@/hooks/use-message-notifications";
 import { updateProfile } from "firebase/auth";
@@ -58,7 +60,7 @@ const DESKTOP_NAV_ITEMS = [
   { id: 'calls' as const, label: 'Calls', icon: Phone },
 ];
 
-type SettingsView = 'main' | 'security' | 'theme' | 'language' | 'privacy' | 'accountMode';
+type SettingsView = 'main' | 'security' | 'theme' | 'privacy' | 'accountMode' | 'developer';
 
 function timeAgo(ts: any) {
   const ms = ts?.toMillis?.();
@@ -82,6 +84,7 @@ export default function MessengerApp() {
   const isMobile = useIsMobile();
 
   const [activeTab, setActiveTab] = useState<TabType>('chats');
+  const [isLockDropdownOpen, setIsLockDropdownOpen] = useState(false);
   const [chats, setChats] = useState<ChatSummary[]>([]);
   const [directory, setDirectory] = useState<DirectoryUser[]>([]);
   const [callHistory, setCallHistory] = useState<Array<CallDoc & { id: string }>>([]);
@@ -130,7 +133,7 @@ export default function MessengerApp() {
   const [selectedUserDetails, setSelectedUserDetails] = useState<DirectoryUser | null>(null);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [pinDialogOpen, setPinDialogOpen] = useState(false);
+  const [setupLockType, setSetupLockType] = useState<"pin" | "password" | "pattern" | null>(null);
   const [pinValue, setPinValue] = useState('');
   const [isExportingData, setIsExportingData] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -139,14 +142,14 @@ export default function MessengerApp() {
 
   // App Lock: require the PIN once per app load if enabled.
   useEffect(() => {
-    if (settings.appLockEnabled && settings.appLockPinHash) {
+    if (settings.appLockType !== "none" && settings.appLockHash) {
       setLocked(true);
     } else {
       setLocked(false);
     }
     // Only re-evaluate when the lock is (de)activated, not on every settings change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settings.appLockEnabled, settings.appLockPinHash]);
+  }, [settings.appLockType, settings.appLockHash]);
 
   // Redirect unauthenticated visitors to the login page.
   useEffect(() => {
@@ -545,62 +548,74 @@ export default function MessengerApp() {
   };
 
   const handleDownloadMyData = async () => {
-    if (!user) return;
+    if (!profile) return;
     setIsExportingData(true);
     try {
-      const chatsSnap = await getDocs(collection(db, "chats"));
-      const myChats = chatsSnap.docs
-        .map((d) => ({ id: d.id, ...(d.data() as any) }))
-        .filter((c: any) => (c.participants || []).includes(user.uid));
-
-      const chatsWithMessages = await Promise.all(
-        myChats.map(async (c: any) => {
-          const msgsSnap = await getDocs(collection(db, "chats", c.id, "messages"));
-          return {
-            ...c,
-            messages: msgsSnap.docs.map((m) => ({ id: m.id, ...(m.data() as any) })),
-          };
-        })
-      );
-
-      const exportPayload = {
-        exportedAt: new Date().toISOString(),
-        profile,
-        chats: chatsWithMessages,
+      // Dynamically import jsPDF to avoid SSR issues
+      const { jsPDF } = await import("jspdf");
+      const doc = new jsPDF();
+      
+      doc.setFontSize(22);
+      doc.text("My Messenger - Data Export", 20, 20);
+      
+      doc.setFontSize(16);
+      doc.text("Profile Information", 20, 35);
+      
+      doc.setFontSize(12);
+      let y = 45;
+      
+      const addRow = (label: string, value: string) => {
+        doc.setFont("helvetica", "bold");
+        doc.text(`${label}:`, 20, y);
+        doc.setFont("helvetica", "normal");
+        // Handle long text wrapping
+        const splitText = doc.splitTextToSize(value || "Not provided", 120);
+        doc.text(splitText, 60, y);
+        y += 8 * splitText.length;
       };
-
-      const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `my-messenger-data-${user.uid}.json`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-      toast({ title: "Your data is downloading" });
+      
+      addRow("Name", profile.name);
+      addRow("Email", profile.email);
+      addRow("Status", profile.status);
+      addRow("Account Mode", profile.accountMode === 'private' ? 'Private' : 'Public');
+      addRow("Bio", profile.bio || "");
+      addRow("Location", profile.location || "");
+      addRow("Website", profile.website || "");
+      addRow("Occupation", profile.occupation || "");
+      
+      const dateString = new Date().toLocaleDateString();
+      addRow("Export Date", dateString);
+      
+      doc.save(`my-messenger-data-${profile.name.replace(/\s+/g, '-').toLowerCase()}.pdf`);
+      
+      toast({ title: "Download Complete", description: "Your data has been exported as a PDF." });
     } catch (error: any) {
-      console.error("Data export failed", error);
-      toast({ title: "Couldn't export your data", description: "Please try again." });
+      console.error(error);
+      toast({ title: "Export Failed", description: "There was an error downloading your data." });
     } finally {
       setIsExportingData(false);
     }
   };
 
-  const handleSetAppLockPin = async () => {
-    if (pinValue.length < 4) {
+  const handleSetAppLock = async (hashStr: string) => {
+    if (!setupLockType) return;
+    if (setupLockType === "pin" && hashStr.length < 4) {
       toast({ title: "PIN too short", description: "Use at least 4 digits." });
       return;
     }
-    const hash = await sha256(pinValue);
-    updateSettings({ appLockEnabled: true, appLockPinHash: hash });
-    setPinDialogOpen(false);
+    if (setupLockType === "password" && hashStr.length < 4) {
+      toast({ title: "Password too short", description: "Use at least 4 characters." });
+      return;
+    }
+    const hash = await sha256(hashStr);
+    updateSettings({ appLockType: setupLockType, appLockHash: hash });
+    setSetupLockType(null);
     setPinValue('');
-    toast({ title: "App Lock enabled" });
+    toast({ title: `App Lock enabled` });
   };
 
   const handleDisableAppLock = () => {
-    updateSettings({ appLockEnabled: false, appLockPinHash: null });
+    updateSettings({ appLockType: "none", appLockHash: null });
     toast({ title: "App Lock disabled" });
   };
 
@@ -612,8 +627,8 @@ export default function MessengerApp() {
     );
   }
 
-  if (locked && settings.appLockPinHash) {
-    return <AppLockScreen expectedHash={settings.appLockPinHash} onUnlock={() => setLocked(false)} />;
+  if (locked && settings.appLockType !== "none" && settings.appLockHash) {
+    return <AppLockScreen lockType={settings.appLockType} expectedHash={settings.appLockHash} onUnlock={() => setLocked(false)} />;
   }
 
 
@@ -771,8 +786,8 @@ export default function MessengerApp() {
                         { id: 'accountMode' as const, icon: UserCog, label: 'Account Mode' },
                         { id: 'security' as const, icon: Shield, label: 'Account Security' },
                         { id: 'theme' as const, icon: Palette, label: 'Theme & Appearance' },
-                        { id: 'language' as const, icon: TextQuote, label: 'Language' },
                         { id: 'privacy' as const, icon: Lock, label: 'Privacy Policy' },
+                        { id: 'developer' as const, icon: Code, label: 'Developer' },
                       ].map((item, i) => (
                         <button
                           key={i}
@@ -839,35 +854,99 @@ export default function MessengerApp() {
                     <div className="app-surface p-4 rounded-[28px] space-y-4">
                       <div className="flex items-center justify-between">
                         <div>
-                          <h5 className="text-sm font-semibold">App Lock (PIN)</h5>
-                          <p className="text-xs text-muted-foreground">Require a PIN to open the app</p>
+                          <h5 className="text-sm font-semibold">App Lock System</h5>
+                          <p className="text-xs text-muted-foreground">Select how to lock your app</p>
                         </div>
-                        <Switch
-                          checked={settings.appLockEnabled}
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              setPinValue('');
-                              setPinDialogOpen(true);
-                            } else {
-                              handleDisableAppLock();
-                            }
-                          }}
-                        />
                       </div>
-                      {settings.appLockEnabled && (
+                      
+                      <div className={cn("py-2 relative", isLockDropdownOpen && "z-[60]")}>
+                        <button 
+                          onClick={() => setIsLockDropdownOpen(!isLockDropdownOpen)}
+                          className="w-full rounded-xl bg-muted/50 hover:bg-muted/70 border border-transparent h-12 px-4 flex items-center justify-between focus:ring-2 focus:ring-accent/50 cursor-pointer font-medium transition-colors"
+                        >
+                          <span className="capitalize">{settings.appLockType === 'none' ? 'Disabled' : settings.appLockType}</span>
+                          <ChevronDown className={cn("h-4 w-4 opacity-50 transition-transform", isLockDropdownOpen && "rotate-180")} />
+                        </button>
+                        
+                        {isLockDropdownOpen && (
+                          <>
+                            <div 
+                              className="fixed inset-0 z-40" 
+                              onClick={() => setIsLockDropdownOpen(false)} 
+                            />
+                            <div className="absolute top-[calc(100%+8px)] left-0 w-full bg-card/95 backdrop-blur-xl text-card-foreground rounded-2xl shadow-xl border border-accent/20 z-50 overflow-hidden py-2 animate-in fade-in zoom-in-95 duration-150">
+                              {[
+                                { value: 'none', label: 'Disabled' },
+                                { value: 'pin', label: 'PIN' },
+                                { value: 'password', label: 'Password' },
+                                { value: 'pattern', label: 'Pattern' }
+                              ].map(option => (
+                                <button
+                                  key={option.value}
+                                  onClick={() => {
+                                    setIsLockDropdownOpen(false);
+                                    if (option.value === 'none') {
+                                      handleDisableAppLock();
+                                    } else if (option.value !== settings.appLockType) {
+                                      setSetupLockType(option.value as "pin" | "password" | "pattern");
+                                      setPinValue('');
+                                    }
+                                  }}
+                                  className="w-full text-left px-4 py-3 text-sm hover:bg-muted focus:bg-muted transition-colors flex items-center justify-between font-medium outline-none"
+                                >
+                                  {option.label}
+                                  {settings.appLockType === option.value && <Check className="h-4 w-4 text-primary" />}
+                                </button>
+                              ))}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                      
+                      {settings.appLockType !== 'none' && (
                         <Button
                           variant="outline"
                           size="sm"
-                          className="rounded-xl"
-                          onClick={() => { setPinValue(''); setPinDialogOpen(true); }}
+                          className="rounded-xl w-full"
+                          onClick={() => { setPinValue(''); setSetupLockType(settings.appLockType as "pin" | "password" | "pattern"); }}
                         >
-                          <KeyRound className="h-3.5 w-3.5 mr-2" /> Change PIN
+                          <KeyRound className="h-3.5 w-3.5 mr-2" /> Change {settings.appLockType}
                         </Button>
                       )}
                     </div>
-                    <Button variant="outline" className="w-full rounded-xl" onClick={handleChangePassword}>
-                      Reset Password by Email
-                    </Button>
+
+                    <div className="app-surface p-4 rounded-[28px] space-y-4">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 bg-primary/10 rounded-full flex items-center justify-center text-primary">
+                          <Shield className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <h5 className="text-sm font-semibold">Security Information</h5>
+                          <p className="text-xs text-muted-foreground">Why app lock is important</p>
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        App lock adds an extra layer of security to your messages. Even if someone unlocks your phone, they won't be able to access your private conversations without your specific app lock PIN, password, or pattern. We use advanced local encryption to keep your data safe.
+                      </p>
+                    </div>
+
+                    <div className="app-surface p-4 rounded-[28px] space-y-4">
+                       <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 bg-primary/10 rounded-full flex items-center justify-center text-primary">
+                          <Lock className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <h5 className="text-sm font-semibold">Account Recovery</h5>
+                          <p className="text-xs text-muted-foreground">Manage your login credentials</p>
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground leading-relaxed mb-4">
+                        If you ever forget your password, you can reset it securely via your registered email address. This ensures that you never lose access to your account permanently.
+                      </p>
+                      <Button variant="outline" className="w-full rounded-xl" onClick={handleChangePassword}>
+                        Reset Password by Email
+                      </Button>
+                    </div>
                   </div>
                 )}
 
@@ -908,25 +987,92 @@ export default function MessengerApp() {
                         />
                       </div>
                     </div>
+                    
+                    <div className="app-surface p-5 rounded-[28px] space-y-6">
+                      <div>
+                        <span className="text-sm font-semibold mb-3 block">Text Size</span>
+                        <div className="flex bg-primary/5 p-1 rounded-full items-center justify-between border border-primary/20">
+                          {(['small', 'medium', 'large'] as const).map(size => (
+                            <button
+                              key={size}
+                              onClick={() => updateSettings({ fontSize: size })}
+                              className={cn(
+                                "flex-1 text-xs font-semibold py-2.5 rounded-full capitalize transition-colors",
+                                settings.fontSize === size ? "bg-primary text-white shadow-md shadow-primary/20" : "text-muted-foreground hover:bg-primary/10"
+                              )}
+                            >
+                              {size}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="space-y-3">
+                        <span className="text-sm font-semibold">Font Style</span>
+                        <div className="grid grid-cols-2 gap-2">
+                          {(['system', 'inter', 'roboto', 'serif', 'mono'] as const).map(font => (
+                            <button
+                              key={font}
+                              onClick={() => updateSettings({ fontFamily: font })}
+                              className={cn(
+                                "text-xs font-medium py-3 px-3 rounded-xl border text-left capitalize transition-colors",
+                                settings.fontFamily === font ? "border-primary bg-primary/10 text-primary" : "border-border hover:bg-secondary/50 text-muted-foreground"
+                              )}
+                            >
+                              {font}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      
+                      <div className="pt-4 border-t border-border/50">
+                        <span className="text-sm font-semibold mb-4 block text-muted-foreground">Chat Preview</span>
+                        <div className="bg-secondary/30 p-4 rounded-[24px] space-y-4 border border-border/50 relative overflow-hidden">
+                          {/* Left message */}
+                          <div className="flex gap-2">
+                            <div className="bg-primary text-white p-3.5 rounded-2xl rounded-tl-sm text-[length:inherit] max-w-[85%] shadow-sm">
+                              Hey! How does this text look?
+                            </div>
+                          </div>
+                          {/* Right message */}
+                          <div className="flex gap-2 justify-end">
+                            <div className="app-surface border border-border/40 p-3.5 rounded-2xl rounded-tr-sm text-[length:inherit] max-w-[85%] shadow-sm">
+                              Looks perfect to me! The new font is super clear. 🚀
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
 
-                {settingsView === 'language' && (
-                  <div className="space-y-3">
-                    <p className="text-xs text-muted-foreground px-1">
-                      Choosing a language updates your preference. Full app translation is still in progress — the interface currently displays in English.
-                    </p>
-                    <div className="app-surface rounded-[28px] overflow-hidden">
-                      {LANGUAGES.map((lang, i) => (
-                        <button
-                          key={i}
-                          onClick={() => updateSettings({ language: lang })}
-                          className="w-full flex items-center justify-between p-4 border-b last:border-0 hover:bg-muted/30"
-                        >
-                          <span className="text-sm font-medium">{lang}</span>
-                          {settings.language === lang && <Check className="h-4 w-4 text-accent" />}
-                        </button>
-                      ))}
+                {settingsView === 'developer' && (
+                  <div className="space-y-6">
+                    <div className="app-surface p-6 rounded-[32px] text-center space-y-4">
+                      <div className="w-24 h-24 mx-auto rounded-[32px] overflow-hidden shadow-lg border border-accent/20">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img 
+                          src="https://0.gravatar.com/avatar/f93ab0553fdd50e05eca8505fc4ed8e78d6e4956d495dc45b169837cd2ed7987?s=256" 
+                          alt="Saykot" 
+                          className="w-full h-full object-cover" 
+                        />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold font-headline">Saykot</h3>
+                        <p className="text-sm font-medium text-accent">Full-Stack Developer</p>
+                      </div>
+                      <div className="text-sm text-muted-foreground space-y-2 pb-2">
+                        <p>
+                          Hi! I'm Saykot, a passionate Full-Stack Developer based in Barisal, Bangladesh.
+                        </p>
+                        <p>
+                          I specialize in building modern, interactive, and scalable web applications using React, Next.js, Node.js, and other cutting-edge technologies. I love solving complex problems and creating seamless user experiences.
+                        </p>
+                      </div>
+                      <Button asChild className="w-full rounded-xl bg-gradient-to-r from-accent to-primary hover:opacity-90">
+                        <a href="https://saykot.vercel.app/" target="_blank" rel="noopener noreferrer">
+                          <Globe className="h-4 w-4 mr-2" /> View Portfolio
+                        </a>
+                      </Button>
                     </div>
                   </div>
                 )}
@@ -960,9 +1106,19 @@ export default function MessengerApp() {
 
                 {settingsView === 'privacy' && (
                   <div className="space-y-4">
-                    <div className="app-surface prose prose-sm text-muted-foreground p-4 rounded-[28px]">
-                      <p>At My Messenger, we value your privacy. Messages are stored securely in your Firebase project and only shared with the people you message.</p>
-                      <p className="mt-2">We do not sell your data to third parties.</p>
+                    <div className="app-surface prose prose-sm text-muted-foreground p-5 rounded-[28px] border border-border/40">
+                      <h3 className="text-foreground font-semibold text-base mb-3">Privacy & Data Policy</h3>
+                      <p className="mb-2">
+                        At <strong>My Messenger</strong>, your privacy is our highest priority. We are committed to protecting your personal information and ensuring a secure communication experience.
+                      </p>
+                      <ul className="list-disc pl-5 mb-3 space-y-1">
+                        <li><strong>End-to-End Security:</strong> Your messages and calls are processed securely. We employ industry-standard encryption to protect your data in transit and at rest.</li>
+                        <li><strong>Data Ownership:</strong> You retain full control over your personal data. Your profile information, contacts, and chat history are securely stored in your Firebase instance.</li>
+                        <li><strong>No Third-Party Tracking:</strong> We do not sell, rent, or share your personal data with third-party advertisers or data brokers under any circumstances.</li>
+                      </ul>
+                      <p>
+                        By using My Messenger, you consent to our data practices as outlined above. You can download a copy of your profile data at any time using the button below.
+                      </p>
                     </div>
                     <Button
                       variant="outline"
@@ -1443,6 +1599,26 @@ export default function MessengerApp() {
 
               {activeTab === 'calls' && (
                 <div className="space-y-3">
+                  {callHistory.length > 0 && (
+                    <div className="flex justify-end px-2 mb-2">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-muted-foreground hover:text-destructive rounded-xl"
+                        onClick={async () => {
+                          if (user) {
+                            try {
+                              await clearCallHistory(user.uid);
+                            } catch (e) {
+                              console.error("Failed to clear call history", e);
+                            }
+                          }
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" /> Clear History
+                      </Button>
+                    </div>
+                  )}
                   {callHistory.length === 0 && (
                     <div className="app-surface-muted rounded-[30px] border-dashed p-8 text-center">
                       <p className="text-base font-semibold">No calls yet</p>
@@ -1582,28 +1758,37 @@ export default function MessengerApp() {
       </div>
 
       {/* App Lock PIN setup dialog */}
-      <Dialog open={pinDialogOpen} onOpenChange={setPinDialogOpen}>
+      <Dialog open={setupLockType !== null} onOpenChange={(open) => !open && setSetupLockType(null)}>
         <DialogContent className="max-w-xs rounded-3xl">
           <DialogHeader>
-            <DialogTitle>Set App Lock PIN</DialogTitle>
-            <DialogDescription>You'll need this PIN to open My Messenger.</DialogDescription>
+            <DialogTitle>Set App Lock {setupLockType === "pin" ? "PIN" : setupLockType === "password" ? "Password" : "Pattern"}</DialogTitle>
+            <DialogDescription>You'll need this to open My Messenger.</DialogDescription>
           </DialogHeader>
-          <div className="py-2">
-            <Input
-              autoFocus
-              type="password"
-              inputMode="numeric"
-              maxLength={8}
-              value={pinValue}
-              onChange={(e) => setPinValue(e.target.value)}
-              placeholder="Enter a 4-8 digit PIN"
-              className="text-center tracking-[0.5em] rounded-xl h-12 bg-muted/50 border-none"
-            />
+          <div className="py-2 flex justify-center">
+            {setupLockType === "pattern" ? (
+              <PatternLock onComplete={(pattern) => handleSetAppLock(pattern)} />
+            ) : (
+              <Input
+                autoFocus
+                type="password"
+                inputMode={setupLockType === "pin" ? "numeric" : "text"}
+                maxLength={setupLockType === "pin" ? 8 : 64}
+                value={pinValue}
+                onChange={(e) => setPinValue(e.target.value)}
+                placeholder={setupLockType === "pin" ? "Enter a 4-8 digit PIN" : "Enter a password"}
+                className={cn(
+                  "text-center rounded-xl h-12 bg-muted/50 border-none",
+                  setupLockType === "pin" && "tracking-[0.5em]"
+                )}
+              />
+            )}
           </div>
-          <DialogFooter className="flex-row gap-2">
-            <Button variant="ghost" onClick={() => setPinDialogOpen(false)} className="flex-1 rounded-xl">Cancel</Button>
-            <Button onClick={handleSetAppLockPin} className="flex-1 rounded-xl bg-accent hover:bg-accent/90">Save PIN</Button>
-          </DialogFooter>
+          {setupLockType !== "pattern" && (
+            <DialogFooter className="flex-row gap-2">
+              <Button variant="ghost" onClick={() => setSetupLockType(null)} className="flex-1 rounded-xl">Cancel</Button>
+              <Button onClick={() => handleSetAppLock(pinValue)} className="flex-1 rounded-xl bg-accent hover:bg-accent/90">Save</Button>
+            </DialogFooter>
+          )}
         </DialogContent>
       </Dialog>
 
