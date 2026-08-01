@@ -123,20 +123,25 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         if (typeof window !== "undefined") {
           window.localStorage.setItem(LOCAL_KEY, JSON.stringify(next));
         }
-        applyThemeClass(next.theme);
-        if (user) {
-          const ref = doc(db, "users", user.uid, "private", "settings");
-          setDoc(ref, patch, { merge: true }).catch(() => {});
-
-          // If accountMode is changed, sync it to the main user profile for discovery filtering
-          if (patch.accountMode) {
-            updateDoc(doc(db, "users", user.uid), {
-              accountMode: patch.accountMode,
-            }).catch(() => {});
-          }
-        }
         return next;
       });
+
+      // Side effects outside the state updater
+      if (patch.theme) {
+        applyThemeClass(patch.theme);
+      }
+      
+      if (user) {
+        const ref = doc(db, "users", user.uid, "private", "settings");
+        setDoc(ref, patch, { merge: true }).catch((e) => console.error("setDoc settings error:", e));
+
+        // If accountMode is changed, sync it to the main user profile for discovery filtering
+        if (patch.accountMode) {
+          updateDoc(doc(db, "users", user.uid), {
+            accountMode: patch.accountMode,
+          }).catch((e) => console.error("updateDoc accountMode error:", e));
+        }
+      }
     },
     [user]
   );

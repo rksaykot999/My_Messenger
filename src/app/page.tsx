@@ -922,11 +922,11 @@ export default function MessengerApp() {
                         </div>
                         <div className="flex items-center gap-2">
                            <span className={cn("text-xs font-medium px-2 py-1 rounded-full",
-                             settings.accountMode === 'private' ? "bg-amber-100 text-amber-700" : "bg-green-100 text-green-700")}>
-                             {settings.accountMode.toUpperCase()}
+                             (settings?.accountMode || 'public') === 'private' ? "bg-amber-100 text-amber-700" : "bg-green-100 text-green-700")}>
+                             {(settings?.accountMode || 'public').toUpperCase()}
                            </span>
                            <Switch
-                             checked={settings.accountMode === 'private'}
+                             checked={(settings?.accountMode || 'public') === 'private'}
                              onCheckedChange={(checked) => updateSettings({ accountMode: checked ? 'private' : 'public' })}
                            />
                         </div>
