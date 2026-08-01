@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Search, Phone, Video, Shield, Bell, Lock, Palette, TextQuote,
   Smartphone, Eye, ChevronLeft, LogOut, Plus, PhoneMissed, PhoneIncoming, PhoneOutgoing, Loader2,
-  Check, X, Download, KeyRound, MessageSquare, Users,
+  Check, X, Download, KeyRound, MessageSquare, Users, UserCog,
 } from "lucide-react";
 import { ChatView } from "@/components/messaging/ChatView";
 import { CallOverlay } from "@/components/messaging/CallOverlay";
@@ -58,7 +58,7 @@ const DESKTOP_NAV_ITEMS = [
   { id: 'calls' as const, label: 'Calls', icon: Phone },
 ];
 
-type SettingsView = 'main' | 'security' | 'theme' | 'language' | 'privacy';
+type SettingsView = 'main' | 'security' | 'theme' | 'language' | 'privacy' | 'accountMode';
 
 function timeAgo(ts: any) {
   const ms = ts?.toMillis?.();
@@ -746,6 +746,7 @@ export default function MessengerApp() {
                     <h4 className="app-section-label mb-3 ml-2">General</h4>
                     <div className="app-surface rounded-[28px] overflow-hidden">
                       {[
+                        { id: 'accountMode' as const, icon: UserCog, label: 'Account Mode' },
                         { id: 'security' as const, icon: Shield, label: 'Account Security' },
                         { id: 'theme' as const, icon: Palette, label: 'Theme & Appearance' },
                         { id: 'language' as const, icon: TextQuote, label: 'Language' },
@@ -908,7 +909,7 @@ export default function MessengerApp() {
                   </div>
                 )}
 
-                {settingsView === 'privacy' && (
+                {settingsView === 'accountMode' && (
                   <div className="space-y-4">
                     <div className="app-surface p-4 rounded-[28px] space-y-4">
                       <div className="flex items-center justify-between">
@@ -932,7 +933,11 @@ export default function MessengerApp() {
                         </div>
                       </div>
                     </div>
+                  </div>
+                )}
 
+                {settingsView === 'privacy' && (
+                  <div className="space-y-4">
                     <div className="app-surface prose prose-sm text-muted-foreground p-4 rounded-[28px]">
                       <p>At My Messenger, we value your privacy. Messages are stored securely in your Firebase project and only shared with the people you message.</p>
                       <p className="mt-2">We do not sell your data to third parties.</p>

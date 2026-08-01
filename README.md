@@ -1,5 +1,6 @@
 # App build command for web and app: 
-npm run build && npx cap sync android && npx cap open android
+npm run build && npx cap sync android
+npx cap open android
 
 # My Messenger
 
