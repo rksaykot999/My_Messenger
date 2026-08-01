@@ -159,13 +159,22 @@ export async function sendMessage(
   const data = snap.data() as any;
   const otherUid = (data?.participants || []).find((p: string) => p !== senderId);
   const previewText = media ? (media.type === "image" ? "📷 Photo" : "🎥 Video") : text;
-  await updateDoc(chatRef, {
+  const updates: Record<string, any> = {
     lastMessage: previewText,
     lastMessageAt: serverTimestamp(),
     lastSenderId: senderId,
     [`typing.${senderId}`]: null,
-    ...(otherUid ? { [`unread.${otherUid}`]: (data?.unread?.[otherUid] || 0) + 1 } : {}),
+    [`unread.${senderId}`]: 0,
+  };
+
+  const participants = data?.participants || [];
+  participants.forEach((p: string) => {
+    if (p !== senderId) {
+      updates[`unread.${p}`] = (data?.unread?.[p] || 0) + 1;
+    }
   });
+
+  await updateDoc(chatRef, updates);
 }
 
 /** Uploads a photo/video attachment for a chat and returns its download URL. */

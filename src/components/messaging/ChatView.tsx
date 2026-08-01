@@ -166,6 +166,8 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
     if (settings.readReceipts) {
       markMessagesRead(chatId, user.uid);
     }
+    // Also clear the chat-level unread counter if we receive a message while open
+    markChatRead(chatId, user.uid);
   }, [chatId, user, messages.length, settings.readReceipts]);
 
   useEffect(() => {
@@ -800,11 +802,6 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
               </span>
               {mine && !msg.deleted && <StatusIcon status={msg.status} />}
             </div>
-            {isLastReadByThem && (
-              <span className="px-1 text-[10px] font-medium text-accent">
-                Seen{msg.readAt?.toDate ? ` ${msg.readAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ""}
-              </span>
-            )}
           </div>
           );
         })}
