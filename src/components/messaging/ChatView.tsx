@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { ArrowLeft, Phone, Video, Plus, Send, Image as ImageIcon, Camera, Film, Info, Trash2, ShieldOff, ShieldCheck, UserRound, Loader2, Mail, Smile, Reply, X, Search, ChevronUp, ChevronDown, MessageSquare, ChevronRight, UserMinus, Download, LogOut } from "lucide-react";
+import { ArrowLeft, Phone, Video, Plus, Send, Image as ImageIcon, Camera, Film, Info, Trash2, ShieldOff, ShieldCheck, UserRound, Loader2, Mail, Smile, Reply, X, Search, ChevronUp, ChevronDown, MessageSquare, ChevronRight, UserMinus, Download, LogOut, Mic } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -122,6 +122,8 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
   const videoInputRef = useRef<HTMLInputElement | null>(null);
+  const audioInputRef = useRef<HTMLInputElement | null>(null);
+  const gifInputRef = useRef<HTMLInputElement | null>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const swipeState = useRef<{ id: string | null; startX: number; startY: number; isSwiping: boolean }>({ id: null, startX: 0, startY: 0, isSwiping: false });
 
@@ -304,7 +306,7 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
 
   const handleAttachmentSelected = async (
     file: File | undefined,
-    type: "image" | "video"
+    type: "image" | "video" | "audio"
   ) => {
     if (!file || !user) return;
     if (blocked) {
@@ -320,7 +322,7 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
       setIsUploading(true);
       setUploadProgress(0);
       const mediaURL = await uploadChatMedia(id, file, setUploadProgress);
-      await sendMessage(id, user.uid, type === "image" ? "📷 Photo" : "🎥 Video", { type, mediaURL });
+      await sendMessage(id, user.uid, type === "image" ? "📷 Photo" : type === "video" ? "🎥 Video" : "🎤 Voice", { type, mediaURL });
     } catch (err: any) {
       console.error("Failed to send attachment", err);
       toast({
@@ -811,6 +813,8 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
                         </div>
                       </div>
                     </button>
+                  ) : msg.type === "audio" && msg.mediaURL ? (
+                    <audio src={msg.mediaURL} controls className="max-w-[200px] h-10" />
                   ) : (
                     msg.text
                   )}
@@ -982,6 +986,15 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
             className="hidden"
             onChange={(e) => { handleAttachmentSelected(e.target.files?.[0], "video"); e.target.value = ""; }}
           />
+          <input ref={audioInputRef} type="file" accept="audio/*" className="hidden" onChange={(e) => { handleAttachmentSelected(e.target.files?.[0], "audio"); e.target.value = ""; }} />
+          <input ref={gifInputRef} type="file" accept="image/gif" className="hidden" onChange={(e) => { handleAttachmentSelected(e.target.files?.[0], "image"); e.target.value = ""; }} />
+
+          <button type="button" disabled={inputDisabled || isUploading} onClick={() => audioInputRef.current?.click()} className="p-2 shrink-0 text-[#0084ff] hover:bg-white/10 rounded-full transition-colors active:scale-95 disabled:opacity-50">
+             <Mic className="h-5 w-5" />
+          </button>
+          <button type="button" disabled={inputDisabled || isUploading} onClick={() => gifInputRef.current?.click()} className="p-2 shrink-0 text-[#0084ff] hover:bg-white/10 rounded-full transition-colors active:scale-95 disabled:opacity-50">
+             <div className="font-semibold text-[11px] leading-none text-current opacity-90 tracking-wide border-2 border-current px-1.5 py-0.5 rounded-[5px]">GIF</div>
+          </button>
 
           <div className="relative flex-1 flex items-center bg-[#3A3B3C] rounded-full px-1">
             <Input
@@ -1294,7 +1307,7 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
 
       {/* Media Viewer */}
       <Dialog open={!!viewMedia} onOpenChange={(open) => !open && setViewMedia(null)}>
-        <DialogContent className="max-w-4xl w-[95vw] h-[90vh] p-0 overflow-hidden bg-black/95 border-none flex flex-col rounded-[32px]">
+        <DialogContent className="max-w-4xl w-[95vw] h-[90vh] p-0 overflow-hidden bg-black/95 border-none flex flex-col rounded-[32px] [&>button]:hidden">
           <DialogHeader className="sr-only">
             <DialogTitle>Media Viewer</DialogTitle>
           </DialogHeader>

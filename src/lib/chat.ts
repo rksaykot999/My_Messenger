@@ -28,7 +28,7 @@ export interface ChatMessage {
   senderId: string;
   createdAt: Timestamp | null;
   status: "sent" | "delivered" | "read";
-  type?: "text" | "image" | "video";
+  type?: "text" | "image" | "video" | "audio";
   mediaURL?: string;
   reactions?: Record<string, string>;
   replyTo?: { id: string; text: string; senderId: string } | null;
@@ -59,6 +59,7 @@ export interface DirectoryUser {
   status?: string;
   online?: boolean;
   lastSeen?: Timestamp | null;
+  blockedUsers?: string[];
   friends?: string[];
   incomingRequests?: string[];
   outgoingRequests?: string[];
@@ -148,7 +149,7 @@ export async function sendMessage(
   chatId: string,
   senderId: string,
   text: string,
-  media?: { type: "image" | "video"; mediaURL: string },
+  media?: { type: "image" | "video" | "audio"; mediaURL: string },
   replyTo?: { id: string; text: string; senderId: string } | null
 ) {
   const chatRef = doc(db, "chats", chatId);
@@ -163,7 +164,7 @@ export async function sendMessage(
   const snap = await getDoc(chatRef);
   const data = snap.data() as any;
   const otherUid = (data?.participants || []).find((p: string) => p !== senderId);
-  const previewText = media ? (media.type === "image" ? "📷 Photo" : "🎥 Video") : text;
+  const previewText = media ? (media.type === "image" ? "📷 Photo" : media.type === "video" ? "🎥 Video" : "🎤 Voice") : text;
   const updates: Record<string, any> = {
     lastMessage: previewText,
     lastMessageAt: serverTimestamp(),
@@ -214,7 +215,7 @@ export async function sendMessage(
   }
 }
 
-/** Uploads a photo/video attachment for a chat and returns its download URL. */
+/** Uploads a photo/video/audio attachment for a chat and returns its download URL. */
 export async function uploadChatMedia(
   chatId: string,
   file: File,
@@ -222,27 +223,28 @@ export async function uploadChatMedia(
 ): Promise<string> {
   const fileExt = file.name.split('.').pop();
   const fileName = `${chatId}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-  
+
   onProgress?.(10);
-  
+
   const { data, error } = await supabase.storage
     .from('chat-media')
     .upload(fileName, file, {
       cacheControl: '3600',
       upsert: false
     });
-    
+
   if (error) {
+    console.error("Supabase upload error:", error);
     throw error;
   }
-  
+
   onProgress?.(100);
-  
-  const { data: { publicUrl } } = supabase.storage
+
+  const { data: urlData } = supabase.storage
     .from('chat-media')
     .getPublicUrl(fileName);
-    
-  return publicUrl;
+
+  return urlData.publicUrl;
 }
 
 /** Marks every message from the other participant as "read" (double blue check). */
