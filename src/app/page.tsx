@@ -851,7 +851,7 @@ export default function MessengerApp() {
               <div className="space-y-6">
                 {settingsView === 'security' && (
                   <div className="space-y-4">
-                    <div className="app-surface p-4 rounded-[28px] space-y-4">
+                    <div className={cn("app-surface p-4 rounded-[28px] space-y-4 transition-all", isLockDropdownOpen && "relative z-[60]")}>
                       <div className="flex items-center justify-between">
                         <div>
                           <h5 className="text-sm font-semibold">App Lock System</h5>
@@ -859,7 +859,7 @@ export default function MessengerApp() {
                         </div>
                       </div>
                       
-                      <div className={cn("py-2 relative", isLockDropdownOpen && "z-[60]")}>
+                      <div className="py-2 relative">
                         <button 
                           onClick={() => setIsLockDropdownOpen(!isLockDropdownOpen)}
                           className="w-full rounded-xl bg-muted/50 hover:bg-muted/70 border border-transparent h-12 px-4 flex items-center justify-between focus:ring-2 focus:ring-accent/50 cursor-pointer font-medium transition-colors"
