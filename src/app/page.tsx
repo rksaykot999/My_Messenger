@@ -651,6 +651,8 @@ export default function MessengerApp() {
           quickEmoji: chats.find(c => c.id === activeChatId)?.quickEmoji,
         }}
         isBlocked={blockedUsers.includes(selectedPerson.uid)}
+        amIBlocked={selectedPerson.blockedUsers?.includes(user.uid)}
+        isFriend={myFriends.includes(selectedPerson.uid)}
         onBack={() => {
           if (isMobile && window.history.state?.chatOpen) {
             window.history.back();
@@ -1452,6 +1454,8 @@ export default function MessengerApp() {
                     quickEmoji: chats.find(c => c.id === activeChatId)?.quickEmoji,
                   }}
                   isBlocked={blockedUsers.includes(selectedPerson.uid)}
+                  amIBlocked={selectedPerson.blockedUsers?.includes(user.uid)}
+                  isFriend={myFriends.includes(selectedPerson.uid)}
                   onBack={() => setSelectedOtherUid(null)}
                   onCall={(type) => callManager.startCall(
                     { id: selectedPerson.uid, name: selectedPerson.name, avatar: selectedPerson.photoURL },

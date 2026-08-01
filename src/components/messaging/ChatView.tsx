@@ -43,6 +43,7 @@ import {
   deleteChatHistory,
   blockUser,
   unblockUser,
+  unfriendUser,
   uploadChatMedia,
   setTypingStatus,
   subscribeChatDoc,
@@ -71,6 +72,8 @@ interface ChatViewProps {
     quickEmoji?: string;
   };
   isBlocked?: boolean;
+  amIBlocked?: boolean;
+  isFriend?: boolean;
   onBack?: () => void;
   onCall?: (type: 'voice' | 'video') => void;
   onLeaveGroup?: () => void;
@@ -98,6 +101,10 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
   const [confirmBlock, setConfirmBlock] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [confirmDeleteGroup, setConfirmDeleteGroup] = useState(false);
+  const [confirmUnfriend, setConfirmUnfriend] = useState(false);
+  
+  // Combine blocked states for inputs
+  const inputDisabled = isBlocked || amIBlocked;
   const [blocked, setBlocked] = useState(!!isBlocked);
   const [otherTyping, setOtherTyping] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -342,6 +349,14 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
     setInfoOpen(false);
   };
 
+  const handleUnfriend = async () => {
+    if (!user) return;
+    await unfriendUser(user.uid, chat.id);
+    toast({ title: `Unfriended ${chat.name}`, description: "You are no longer friends." });
+    setConfirmUnfriend(false);
+    setInfoOpen(false);
+  };
+
   const handleReact = async (msg: ChatMessage, emoji: string) => {
     if (!chatId) return;
     try {
@@ -514,15 +529,28 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
                   </button>
                 )}
                 {!chat.isGroup && (
-                  <button
-                    onClick={() => { setInfoOpen(false); setConfirmBlock(true); }}
-                    className="w-full flex items-center gap-3 p-3.5 rounded-2xl hover:bg-destructive/10 text-left transition-colors group"
-                  >
-                    <div className="bg-destructive/10 group-hover:bg-destructive/20 p-2 rounded-xl transition-colors">
-                      {blocked ? <ShieldCheck className="h-4 w-4 text-destructive" /> : <ShieldOff className="h-4 w-4 text-destructive" />}
-                    </div>
-                    <span className="text-sm font-semibold text-destructive">{blocked ? 'Unblock User' : 'Block User'}</span>
-                  </button>
+                  <>
+                    {isFriend && (
+                      <button
+                        onClick={() => { setInfoOpen(false); setConfirmUnfriend(true); }}
+                        className="w-full flex items-center gap-3 p-3.5 rounded-2xl hover:bg-destructive/10 text-left transition-colors group"
+                      >
+                        <div className="bg-destructive/10 group-hover:bg-destructive/20 p-2 rounded-xl transition-colors">
+                          <UserMinus className="h-4 w-4 text-destructive" />
+                        </div>
+                        <span className="text-sm font-semibold text-destructive">Unfriend</span>
+                      </button>
+                    )}
+                    <button
+                      onClick={() => { setInfoOpen(false); setConfirmBlock(true); }}
+                      className="w-full flex items-center gap-3 p-3.5 rounded-2xl hover:bg-destructive/10 text-left transition-colors group"
+                    >
+                      <div className="bg-destructive/10 group-hover:bg-destructive/20 p-2 rounded-xl transition-colors">
+                        {isBlocked ? <ShieldCheck className="h-4 w-4 text-destructive" /> : <ShieldOff className="h-4 w-4 text-destructive" />}
+                      </div>
+                      <span className="text-sm font-semibold text-destructive">{isBlocked ? 'Unblock User' : 'Block User'}</span>
+                    </button>
+                  </>
                 )}
               </div>
             </PopoverContent>
@@ -852,7 +880,7 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
         <div className={cn("flex items-end gap-2", embedded ? "mx-0" : "max-w-md mx-auto")}>
           <Popover>
             <PopoverTrigger asChild>
-              <button disabled={blocked || isUploading} className="p-2 shrink-0 text-[#0084ff] hover:bg-white/10 rounded-full transition-colors">
+              <button disabled={inputDisabled || isUploading} className="p-2 shrink-0 text-[#0084ff] hover:bg-white/10 rounded-full transition-colors disabled:opacity-50">
                 {isUploading ? <Loader2 className="h-6 w-6 animate-spin" /> : <Plus className="h-6 w-6" />}
               </button>
             </PopoverTrigger>
@@ -909,15 +937,15 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
               value={inputText}
               onChange={(e) => handleInputChange(e.target.value)}
               onKeyDown={handleKeyPress}
-              placeholder={blocked ? "You've blocked this user" : "Aa"}
-              disabled={blocked}
-              className="flex-1 bg-transparent border-0 focus-visible:ring-0 text-[#E4E6EB] placeholder:text-[#B0B3B8] h-10 px-3 shadow-none focus-visible:ring-offset-0"
+              placeholder={isBlocked ? "You've blocked this user" : amIBlocked ? "You cannot reply to this conversation" : "Aa"}
+              disabled={inputDisabled}
+              className="flex-1 bg-transparent border-0 focus-visible:ring-0 text-[#E4E6EB] placeholder:text-[#B0B3B8] h-10 px-3 shadow-none focus-visible:ring-offset-0 disabled:opacity-50"
             />
             <Popover>
               <PopoverTrigger asChild>
                 <button
                   type="button"
-                  disabled={blocked}
+                  disabled={inputDisabled}
                   className="p-2 text-[#0084ff] transition-colors hover:bg-white/10 rounded-full disabled:opacity-50"
                 >
                   <Smile className="h-6 w-6" />
@@ -940,7 +968,7 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
             </Popover>
           </div>
 
-          {inputText.trim() && !blocked ? (
+          {inputText.trim() && !inputDisabled ? (
             <button
               onClick={handleSend}
               className="p-2 shrink-0 text-[#0084ff] transition-transform active:scale-95 hover:bg-white/10 rounded-full"
@@ -950,7 +978,7 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
           ) : (
             <button
               onClick={handleSendQuickEmoji}
-              disabled={blocked}
+              disabled={inputDisabled}
               className="p-2 shrink-0 text-[#0084ff] transition-transform active:scale-95 disabled:opacity-50 hover:bg-white/10 rounded-full flex items-center justify-center"
             >
                <span className="text-2xl leading-none mb-0.5">{chat.quickEmoji || "👍"}</span>
@@ -1190,6 +1218,24 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
             <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleToggleBlock} className="rounded-xl bg-destructive hover:bg-destructive/90">
               {blocked ? 'Unblock' : 'Block'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Unfriend confirmation */}
+      <AlertDialog open={confirmUnfriend} onOpenChange={setConfirmUnfriend}>
+        <AlertDialogContent className="rounded-2xl max-w-xs">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unfriend {chat.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove them from your friends list?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleUnfriend} className="rounded-xl bg-destructive hover:bg-destructive/90">
+              Unfriend
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

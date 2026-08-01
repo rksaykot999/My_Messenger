@@ -3,14 +3,19 @@
     android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
-    <!-- Simplified white version of the app logo -->
-    <!-- Main bubble -->
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M16.5,13C16.5,10.24 14.26,8 11.5,8C8.74,8 6.5,10.24 6.5,13C6.5,14.15 6.88,15.2 7.53,16.05L6.59,17.94C6.47,18.17 6.71,18.42 6.95,18.33L9.28,17.4C9.96,17.78 10.71,18 11.5,18C14.26,18 16.5,15.76 16.5,13Z" />
-    <!-- Secondary bubble -->
-    <path
-        android:fillColor="#FFFFFF"
-        android:fillAlpha="0.8"
-        android:pathData="M12.4,14.36C12.4,16.24 13.92,17.76 15.8,17.76C16.34,17.76 16.85,16.98 17.31,17.3C18.9,18.4 18.9,18.4 18.9,18.4L18.26,17.11C18.7,16.53 18.96,15.84 18.96,15.08C18.96,13.2 17.44,11.68 15.56,11.68C13.68,11.68 12.16,13.2 12.16,15.08" />
+    <group
+        android:pivotX="12.7"
+        android:pivotY="13.2"
+        android:scaleX="1.6"
+        android:scaleY="1.6">
+        <!-- Main bubble -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M16.5,13C16.5,10.24 14.26,8 11.5,8C8.74,8 6.5,10.24 6.5,13C6.5,14.15 6.88,15.2 7.53,16.05L6.59,17.94C6.47,18.17 6.71,18.42 6.95,18.33L9.28,17.4C9.96,17.78 10.71,18 11.5,18C14.26,18 16.5,15.76 16.5,13Z" />
+        <!-- Secondary bubble -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:fillAlpha="0.8"
+            android:pathData="M12.4,14.36C12.4,16.24 13.92,17.76 15.8,17.76C16.34,17.76 16.85,16.98 17.31,17.3C18.9,18.4 18.9,18.4 18.9,18.4L18.26,17.11C18.7,16.53 18.96,15.84 18.96,15.08C18.96,13.2 17.44,11.68 15.56,11.68C13.68,11.68 12.16,13.2 12.16,15.08" />
+    </group>
 </vector>

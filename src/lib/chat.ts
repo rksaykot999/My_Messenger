@@ -373,6 +373,15 @@ export async function unblockUser(myUid: string, otherUid: string) {
   });
 }
 
+export async function unfriendUser(myUid: string, otherUid: string) {
+  await updateDoc(doc(db, "users", myUid), {
+    friends: arrayRemove(otherUid),
+  });
+  await updateDoc(doc(db, "users", otherUid), {
+    friends: arrayRemove(myUid),
+  });
+}
+
 export async function sendFriendRequest(myUid: string, otherUid: string) {
   await updateDoc(doc(db, "users", myUid), {
     outgoingRequests: arrayUnion(otherUid),
@@ -438,6 +447,7 @@ export function subscribeDirectory(
           incomingRequests: u.incomingRequests || [],
           outgoingRequests: u.outgoingRequests || [],
           accountMode: u.accountMode || "public",
+          blockedUsers: u.blockedUsers || [],
         }))
     );
   });
