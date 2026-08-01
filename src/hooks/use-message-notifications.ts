@@ -48,7 +48,7 @@ export function useMessageNotifications(
       if (isFirstRun) return;
       if (ts <= previous) return;
       if (chat.lastSenderId === myUid) return;
-      if (chat.id === activeChatIdRef.current) return;
+      if (chat.id === activeChatIdRef.current && document.visibilityState === "visible") return;
       if (!chat.lastMessage) return;
 
       const otherUid = chat.participants.find((p) => p !== myUid);

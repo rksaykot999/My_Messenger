@@ -48,6 +48,10 @@ export interface AppUser {
   photoURL: string;
   status: string;
   accountMode?: "public" | "private";
+  bio?: string;
+  location?: string;
+  website?: string;
+  occupation?: string;
 }
 
 interface AuthContextValue {
@@ -216,6 +220,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 `https://picsum.photos/seed/${firebaseUser.uid}/200/200`,
               status: data.status || "Hey there! I'm using My Messenger.",
               accountMode: data.accountMode || "public",
+              bio: data.bio || "",
+              location: data.location || "",
+              website: data.website || "",
+              occupation: data.occupation || "",
             });
           },
           (e) => {

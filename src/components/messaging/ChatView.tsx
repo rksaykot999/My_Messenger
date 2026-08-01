@@ -115,6 +115,7 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
   const [searchQuery, setSearchQuery] = useState("");
   const [searchIndex, setSearchIndex] = useState(0);
   const [viewMedia, setViewMedia] = useState<{ url: string; type: "image" | "video" } | null>(null);
+  const [needsRead, setNeedsRead] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -167,15 +168,65 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
 
   useEffect(() => {
     if (!chatId || !user) return;
-    // New messages just loaded — mark anything from the other person delivered,
-    // and (if I have read receipts on) as read too, since the chat is open.
-    markMessagesDelivered(chatId, user.uid);
-    if (settings.readReceipts) {
-      markMessagesRead(chatId, user.uid);
-    }
-    // Also clear the chat-level unread counter if we receive a message while open
-    markChatRead(chatId, user.uid);
+    
+    const handleRead = (force = false) => {
+      if (document.visibilityState === "visible") {
+        markMessagesDelivered(chatId, user.uid);
+        
+        if (document.hasFocus() || force) {
+          if (settings.readReceipts) {
+            markMessagesRead(chatId, user.uid);
+          }
+          markChatRead(chatId, user.uid);
+          setNeedsRead(false);
+        } else {
+          setNeedsRead(true);
+        }
+      }
+    };
+
+    handleRead();
+
+    const handleFocus = () => handleRead(true);
+    const handleVisibility = () => handleRead(false);
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
   }, [chatId, user, messages.length, settings.readReceipts]);
+
+  // Handle interaction if needsRead is true
+  useEffect(() => {
+    if (!needsRead || !chatId || !user) return;
+    
+    const handleInteraction = () => {
+      if (document.visibilityState === "visible") {
+        if (settings.readReceipts) {
+          markMessagesRead(chatId, user.uid);
+        }
+        markChatRead(chatId, user.uid);
+        setNeedsRead(false);
+      }
+    };
+
+    // Attach one-time listeners
+    window.addEventListener("mousemove", handleInteraction, { once: true });
+    window.addEventListener("keydown", handleInteraction, { once: true });
+    window.addEventListener("touchstart", handleInteraction, { once: true });
+    window.addEventListener("scroll", handleInteraction, { once: true });
+    window.addEventListener("click", handleInteraction, { once: true });
+
+    return () => {
+      window.removeEventListener("mousemove", handleInteraction);
+      window.removeEventListener("keydown", handleInteraction);
+      window.removeEventListener("touchstart", handleInteraction);
+      window.removeEventListener("scroll", handleInteraction);
+      window.removeEventListener("click", handleInteraction);
+    };
+  }, [needsRead, chatId, user, settings.readReceipts]);
 
   useEffect(() => {
     const scrollToBottom = () => {

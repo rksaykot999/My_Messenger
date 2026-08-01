@@ -112,6 +112,11 @@ export default function MessengerApp() {
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [editBio, setEditBio] = useState('');
+  const [editLocation, setEditLocation] = useState('');
+  const [editWebsite, setEditWebsite] = useState('');
+  const [editOccupation, setEditOccupation] = useState('');
+  const [selectedUserDetails, setSelectedUserDetails] = useState<DirectoryUser | null>(null);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [pinDialogOpen, setPinDialogOpen] = useState(false);
@@ -168,21 +173,25 @@ export default function MessengerApp() {
 
   useEffect(() => {
     if (isSubScreenActive) {
-      if (!window.history.state?.internal) {
-        window.history.pushState({ internal: true }, '');
+      if (window.location.hash !== '#modal') {
+        window.history.pushState(null, '', '#modal');
       }
-    } else if (window.history.state?.internal) {
-      window.history.back();
+    } else {
+      if (window.location.hash === '#modal') {
+        window.history.back();
+      }
     }
   }, [isSubScreenActive]);
 
   useEffect(() => {
     const handlePopState = () => {
-      setSelectedOtherUid(null);
-      setSelectedGroupId(null);
-      setIsCreateGroupOpen(false);
-      setChatSearchOpen(false);
-      setSettingsView('main');
+      if (window.location.hash !== '#modal') {
+        setSelectedOtherUid(null);
+        setSelectedGroupId(null);
+        setIsCreateGroupOpen(false);
+        setChatSearchOpen(false);
+        setSettingsView('main');
+      }
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
@@ -262,31 +271,16 @@ export default function MessengerApp() {
       const chat = chats.find((c) => c.id === chatId);
       const otherUid = chat?.participants.find((p) => p !== user?.uid);
       if (chat?.isGroup) {
-        if (isMobile && !selectedGroupId && !selectedOtherUid) {
-          window.history.pushState({ chatOpen: true }, '');
-        }
         setSelectedGroupId(chatId);
         setSelectedOtherUid(null);
       } else if (otherUid) {
-        if (isMobile && !selectedOtherUid && !selectedGroupId) {
-          window.history.pushState({ chatOpen: true }, '');
-        }
         setSelectedOtherUid(otherUid);
         setSelectedGroupId(null);
       }
     }
   );
 
-  useEffect(() => {
-    const handlePopState = () => {
-      if (selectedOtherUid || selectedGroupId) {
-        setSelectedOtherUid(null);
-        setSelectedGroupId(null);
-      }
-    };
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
-  }, [selectedOtherUid, selectedGroupId]);
+
 
   const filteredDirectory = directory.filter((d) => {
     const matchesSearch = d.name.toLowerCase().includes(searchQuery.toLowerCase());
@@ -347,18 +341,16 @@ export default function MessengerApp() {
       filteredDirectory.filter(
         (person) =>
           !myFriends.includes(person.uid) &&
+          !chats.some(c => !c.isGroup && c.participants.includes(person.uid)) &&
           !incomingRequests.includes(person.uid) &&
           !outgoingRequests.includes(person.uid) &&
           person.accountMode !== 'private' // Suggestions should only be public people
       ),
-    [filteredDirectory, incomingRequests, myFriends, outgoingRequests]
+    [filteredDirectory, incomingRequests, myFriends, outgoingRequests, chats]
   );
 
   const openConversation = async (otherUid: string | null, chatId?: string, isGroup?: boolean) => {
     if (!user) return;
-    if (isMobile && !selectedOtherUid && !selectedGroupId) {
-      window.history.pushState({ chatOpen: true }, '');
-    }
     if (isGroup && chatId) {
       setSelectedGroupId(chatId);
       setSelectedOtherUid(null);
@@ -508,6 +500,10 @@ export default function MessengerApp() {
       await updateDoc(fsDoc(db, "users", auth.currentUser.uid), {
         name: editName,
         status: editStatus,
+        bio: editBio,
+        location: editLocation,
+        website: editWebsite,
+        occupation: editOccupation,
         photoURL,
       });
 
@@ -714,7 +710,15 @@ export default function MessengerApp() {
                   <p className="text-sm text-muted-foreground">{profile?.email}</p>
                   <Button
                     variant="outline"
-                    onClick={() => { setEditName(profile?.name || ''); setEditStatus(profile?.status || ''); setIsProfileEditing(true); }}
+                    onClick={() => { 
+                      setEditName(profile?.name || ''); 
+                      setEditStatus(profile?.status || ''); 
+                      setEditBio(profile?.bio || '');
+                      setEditLocation(profile?.location || '');
+                      setEditWebsite(profile?.website || '');
+                      setEditOccupation(profile?.occupation || '');
+                      setIsProfileEditing(true); 
+                    }}
                     className="mt-4 rounded-full px-6 text-xs h-8"
                   >
                     Edit Profile
@@ -1011,7 +1015,7 @@ export default function MessengerApp() {
                   </Avatar>
                 </button>
               </PopoverTrigger>
-              <PopoverContent side="right" align="end" sideOffset={20} className="w-[420px] max-h-[85vh] overflow-y-auto p-4 rounded-[34px] border border-border/70 bg-background/66 shadow-[0_24px_60px_rgba(0,0,0,0.25)] backdrop-blur-2xl z-50 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+              <PopoverContent side="right" align="end" sideOffset={20} collisionPadding={16} className="w-[420px] h-[calc(100vh-32px)] overflow-y-auto p-4 rounded-[34px] border border-border/70 bg-background/66 shadow-[0_24px_60px_rgba(0,0,0,0.25)] backdrop-blur-2xl z-50 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                 <div className="mb-4 flex items-center justify-between px-2">
                   <div>
                     <h3 className="text-xl font-bold font-headline">Settings</h3>
@@ -1106,7 +1110,7 @@ export default function MessengerApp() {
               )}
             </header>
 
-            <main className="flex-1 overflow-y-auto px-5 pb-24 pt-5 animate-in fade-in slide-in-from-bottom-2 duration-300 lg:px-6 lg:pb-6">
+            <main className="flex-1 overflow-y-auto px-5 pb-24 pt-5 animate-in fade-in slide-in-from-bottom-2 duration-300 lg:px-6 lg:pb-6 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
               {activeTab === 'chats' && (
                 <div className="space-y-6">
                   {/* Friend Requests - Small Notification */}
@@ -1295,7 +1299,7 @@ export default function MessengerApp() {
                       </div>
                       <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-none">
                         {discoverOnlinePeople.map((person) => {
-                          const isFriend = myFriends.includes(person.uid);
+                          const isFriend = myFriends.includes(person.uid) || chats.some(c => !c.isGroup && c.participants.includes(person.uid));
                           return (
                             <div key={person.uid} className="group flex flex-col items-center gap-2 min-w-[80px]">
                               <button onClick={() => isFriend ? openConversation(person.uid) : null} className="relative">
@@ -1322,7 +1326,7 @@ export default function MessengerApp() {
                     <div className="flex items-center justify-between px-1">
                       <h3 className="text-sm font-semibold text-muted-foreground">People Directory</h3>
                       <Badge variant="secondary" className="rounded-full text-xs">
-                        {discoverSuggestions.length} suggestions
+                        {filteredDirectory.length} people
                       </Badge>
                     </div>
                     
@@ -1333,12 +1337,12 @@ export default function MessengerApp() {
                         </div>
                       )}
                       {filteredDirectory.map((person) => {
-                        const isFriend = myFriends.includes(person.uid);
+                        const isFriend = myFriends.includes(person.uid) || chats.some(c => !c.isGroup && c.participants.includes(person.uid));
                         const hasOutgoing = outgoingRequests.includes(person.uid);
                         const hasIncoming = incomingRequests.includes(person.uid);
                         return (
                           <div key={person.uid} className="app-card-hover flex items-center justify-between gap-4 rounded-[24px] p-3 hover:bg-muted/50 transition-colors">
-                            <div className="flex min-w-0 items-center gap-3">
+                            <button onClick={() => setSelectedUserDetails(person)} className="flex min-w-0 items-center gap-3 text-left hover:opacity-80 transition-opacity">
                               <div className="relative">
                                 <Avatar className="h-12 w-12">
                                   <AvatarImage src={person.photoURL} />
@@ -1354,7 +1358,7 @@ export default function MessengerApp() {
                                   {person.status || (person.online ? 'Online' : 'Offline')}
                                 </p>
                               </div>
-                            </div>
+                            </button>
                             
                             <div className="flex items-center gap-2">
                                {isFriend ? (
@@ -1562,7 +1566,7 @@ export default function MessengerApp() {
               <button
                 type="button"
                 onClick={handlePhotoSelection}
-                className="relative rounded-full border border-muted/60 p-1 hover:ring-2 hover:ring-accent transition-all"
+                className="relative rounded-full aspect-square border border-muted/60 p-1 hover:ring-2 hover:ring-accent transition-all flex items-center justify-center"
               >
                 <Avatar className="h-20 w-20">
                   <AvatarImage src={photoPreview || profile?.photoURL} />
@@ -1592,6 +1596,24 @@ export default function MessengerApp() {
             <div className="space-y-2">
               <label className="text-[10px] font-bold uppercase tracking-wider ml-1">Status</label>
               <Input value={editStatus} onChange={(e) => setEditStatus(e.target.value)} className="rounded-xl bg-muted/50 border-none" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-wider ml-1">Bio</label>
+              <Input value={editBio} onChange={(e) => setEditBio(e.target.value)} placeholder="A little about yourself..." className="rounded-xl bg-muted/50 border-none" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold uppercase tracking-wider ml-1">Location</label>
+                <Input value={editLocation} onChange={(e) => setEditLocation(e.target.value)} placeholder="City, Country" className="rounded-xl bg-muted/50 border-none" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold uppercase tracking-wider ml-1">Occupation</label>
+                <Input value={editOccupation} onChange={(e) => setEditOccupation(e.target.value)} placeholder="What do you do?" className="rounded-xl bg-muted/50 border-none" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-wider ml-1">Website</label>
+              <Input value={editWebsite} onChange={(e) => setEditWebsite(e.target.value)} placeholder="https://" className="rounded-xl bg-muted/50 border-none" />
             </div>
           </div>
           <DialogFooter className="flex-row gap-2">
@@ -1729,10 +1751,82 @@ export default function MessengerApp() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsCreateGroupOpen(false)}>Cancel</Button>
-            <Button onClick={handleCreateGroup} disabled={!createGroupName.trim() || createGroupSelectedFriends.length === 0}>
+            <Button onClick={handleCreateGroup} disabled={!createGroupName.trim() || createGroupSelectedFriends.length < 2}>
               Create Group
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* User Details Dialog */}
+      <Dialog open={!!selectedUserDetails} onOpenChange={(open) => !open && setSelectedUserDetails(null)}>
+        <DialogContent className="sm:max-w-md rounded-3xl p-0 overflow-hidden bg-background/95 backdrop-blur-3xl border border-border/50">
+          <div className="relative">
+            {/* Header Background */}
+            <div className="h-32 bg-gradient-to-br from-primary/20 via-accent/10 to-background/5" />
+            
+            <div className="px-6 pb-6 -mt-12 relative">
+              <Avatar className="h-24 w-24 ring-4 ring-background shadow-xl bg-muted mb-4">
+                <AvatarImage src={selectedUserDetails?.photoURL} />
+                <AvatarFallback className="text-xl">{selectedUserDetails?.name[0]}</AvatarFallback>
+              </Avatar>
+              
+              <div className="space-y-1 mb-6">
+                <h2 className="text-2xl font-bold font-headline">{selectedUserDetails?.name}</h2>
+                {selectedUserDetails?.status && (
+                  <p className="text-sm text-muted-foreground">{selectedUserDetails.status}</p>
+                )}
+              </div>
+
+              {(() => {
+                const hasDetails = selectedUserDetails?.bio || selectedUserDetails?.location || selectedUserDetails?.occupation || selectedUserDetails?.website;
+                if (!hasDetails) {
+                  return (
+                    <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground bg-muted/20 rounded-2xl border border-dashed border-border/50">
+                      <p className="text-sm font-medium">No additional details provided</p>
+                    </div>
+                  );
+                }
+                return (
+                  <div className="grid gap-4 text-sm bg-muted/20 p-5 rounded-2xl border border-border/50">
+                    {selectedUserDetails?.bio && (
+                      <div>
+                        <h4 className="font-semibold text-[11px] uppercase tracking-wider text-muted-foreground mb-1">About</h4>
+                        <p className="text-foreground/90">{selectedUserDetails.bio}</p>
+                      </div>
+                    )}
+                    
+                    {(selectedUserDetails?.location || selectedUserDetails?.occupation) && (
+                      <div className="grid grid-cols-2 gap-4">
+                        {selectedUserDetails?.location && (
+                          <div>
+                            <h4 className="font-semibold text-[11px] uppercase tracking-wider text-muted-foreground mb-1">Location</h4>
+                            <p className="text-foreground/90">{selectedUserDetails.location}</p>
+                          </div>
+                        )}
+                        {selectedUserDetails?.occupation && (
+                          <div>
+                            <h4 className="font-semibold text-[11px] uppercase tracking-wider text-muted-foreground mb-1">Occupation</h4>
+                            <p className="text-foreground/90">{selectedUserDetails.occupation}</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {selectedUserDetails?.website && (
+                      <div>
+                        <h4 className="font-semibold text-[11px] uppercase tracking-wider text-muted-foreground mb-1">Website</h4>
+                        <a href={selectedUserDetails.website.startsWith('http') ? selectedUserDetails.website : `https://${selectedUserDetails.website}`} target="_blank" rel="noreferrer" className="text-primary hover:underline">
+                          {selectedUserDetails.website}
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

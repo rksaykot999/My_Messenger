@@ -77,7 +77,11 @@ export class CallSession {
 
   private async getMedia(type: CallType) {
     const stream = await navigator.mediaDevices.getUserMedia({
-      audio: true,
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      },
       video: type === "video",
     });
     this.localStream = stream;

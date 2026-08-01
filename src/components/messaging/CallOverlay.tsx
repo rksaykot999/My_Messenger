@@ -66,10 +66,16 @@ export function CallOverlay({
       try {
         AudioRouter.setSpeaker({ speakerOn: isSpeaker });
       } catch (e) {
-        console.warn("AudioRouter not available", e);
+        // Fallback for Web/PWA: Lower the volume to simulate an earpiece
+        if (remoteAudioRef.current) {
+          remoteAudioRef.current.volume = isSpeaker ? 1.0 : 0.15;
+        }
+        if (remoteVideoRef.current) {
+          remoteVideoRef.current.volume = isSpeaker ? 1.0 : 0.15;
+        }
       }
     }
-  }, [isSpeaker]);
+  }, [isSpeaker, remoteStream]);
 
   const [hasRemoteVideo, setHasRemoteVideo] = useState(
     () => type === 'video' && !!(remoteStream && remoteStream.getVideoTracks().length > 0)
@@ -214,7 +220,7 @@ export function CallOverlay({
               variant="secondary"
               size="icon"
               onClick={toggleMute}
-              className={cn("h-14 w-14 rounded-full bg-white/10 hover:bg-white/20 border-none text-white", isMuted && "bg-white text-slate-900")}
+              className={cn("h-14 w-14 rounded-full bg-white/10 hover:bg-white/20 border-none text-white transition-colors", isMuted && "!bg-white !text-slate-900 hover:!bg-white/90")}
             >
               {isMuted ? <MicOff className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
             </Button>
@@ -222,7 +228,7 @@ export function CallOverlay({
               variant="secondary"
               size="icon"
               onClick={() => setIsSpeaker(!isSpeaker)}
-              className={cn("h-14 w-14 rounded-full bg-white/10 hover:bg-white/20 border-none text-white", isSpeaker && "bg-white text-slate-900")}
+              className={cn("h-14 w-14 rounded-full bg-white/10 hover:bg-white/20 border-none text-white transition-colors", isSpeaker && "!bg-white !text-slate-900 hover:!bg-white/90")}
             >
               <Volume2 className="h-6 w-6" />
             </Button>
@@ -231,7 +237,7 @@ export function CallOverlay({
               size="icon"
               onClick={toggleVideo}
               disabled={type !== 'video'}
-              className={cn("h-14 w-14 rounded-full bg-white/10 hover:bg-white/20 border-none text-white", isVideoOn && type === 'video' && "bg-white text-slate-900")}
+              className={cn("h-14 w-14 rounded-full bg-white/10 hover:bg-white/20 border-none text-white transition-colors", isVideoOn && type === 'video' && "!bg-white !text-slate-900 hover:!bg-white/90")}
             >
               {isVideoOn ? <Video className="h-6 w-6" /> : <VideoOff className="h-6 w-6" />}
             </Button>

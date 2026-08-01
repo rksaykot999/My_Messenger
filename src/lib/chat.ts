@@ -63,6 +63,10 @@ export interface DirectoryUser {
   incomingRequests?: string[];
   outgoingRequests?: string[];
   accountMode?: "public" | "private";
+  bio?: string;
+  location?: string;
+  website?: string;
+  occupation?: string;
 }
 
 // Deterministic chat id for a 1:1 conversation between two users.
@@ -452,6 +456,10 @@ export function subscribeDirectory(
           outgoingRequests: u.outgoingRequests || [],
           accountMode: u.accountMode || "public",
           blockedUsers: u.blockedUsers || [],
+          bio: u.bio || "",
+          location: u.location || "",
+          website: u.website || "",
+          occupation: u.occupation || "",
         }))
     );
   });
