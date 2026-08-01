@@ -175,6 +175,37 @@ export async function sendMessage(
   });
 
   await updateDoc(chatRef, updates);
+
+  // --- CLIENT-SIDE PUSH NOTIFICATIONS ---
+  // Only attempt to send notifications to others
+  if (participants.length > 1) {
+    try {
+      const { sendDirectPushNotification } = await import('./fcm');
+      
+      // Get sender's name for the title
+      const senderSnap = await getDoc(doc(db, 'users', senderId));
+      const senderData = senderSnap.data() as any;
+      const senderName = senderData?.name || 'New Message';
+
+      // Send a push notification to each other participant
+      for (const p of participants) {
+        if (p === senderId) continue;
+        
+        const recipientSnap = await getDoc(doc(db, 'users', p));
+        const recipientData = recipientSnap.data() as any;
+        if (recipientData?.fcmToken) {
+          sendDirectPushNotification(
+            recipientData.fcmToken,
+            senderName,
+            previewText,
+            { chatId, senderId }
+          );
+        }
+      }
+    } catch (err) {
+      console.error('Failed to trigger direct push notification:', err);
+    }
+  }
 }
 
 /** Uploads a photo/video attachment for a chat and returns its download URL. */

@@ -126,6 +126,22 @@ export class CallSession {
       createdAt: serverTimestamp(),
     });
 
+    try {
+      const { sendDirectPushNotification } = await import('./fcm');
+      const recipientSnap = await getDoc(doc(db, 'users', params.calleeId));
+      const recipientData = recipientSnap.data() as any;
+      if (recipientData?.fcmToken) {
+        sendDirectPushNotification(
+          recipientData.fcmToken,
+          'Incoming Call',
+          `${params.callerName} is calling you`,
+          { callId: this.callId, type: params.type }
+        );
+      }
+    } catch (err) {
+      console.error('Failed to trigger direct call notification:', err);
+    }
+
     // Watch for the answer.
     const unsubCall = onSnapshot(callRef, (snap) => {
       const data = snap.data();
