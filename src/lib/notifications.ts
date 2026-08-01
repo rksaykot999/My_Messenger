@@ -35,6 +35,7 @@ export function showMessageNotification(opts: {
           title: opts.title,
           body: opts.body,
           id: Math.floor(Math.random() * 100000),
+          smallIcon: 'ic_stat_message',
           extra: { chatId: opts.chatId },
         },
       ],
