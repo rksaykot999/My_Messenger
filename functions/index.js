@@ -28,11 +28,15 @@ exports.onNewMessage = functions.firestore
       return null;
     }
 
+    // Get the sender's profile for the notification title
+    const senderSnap = await admin.firestore().doc(`users/${senderId}`).get();
+    const senderData = senderSnap.data();
+    const senderName = senderData ? senderData.name : "New Message";
+
     const payload = {
       notification: {
-        title: userData.name || "New Message",
+        title: senderName,
         body: message.text || "📷 Photo",
-        clickAction: "FLUTTER_NOTIFICATION_CLICK",
       },
       data: {
         chatId: chatId,

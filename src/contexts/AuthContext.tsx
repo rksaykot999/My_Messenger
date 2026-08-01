@@ -71,24 +71,62 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const registerPush = async (uid: string) => {
-      if (!Capacitor.isNativePlatform()) return;
+      if (Capacitor.isNativePlatform()) {
+        try {
+          let perm = await PushNotifications.checkPermissions();
+          if (perm.receive === "prompt") {
+            perm = await PushNotifications.requestPermissions();
+          }
+          if (perm.receive !== "granted") return;
 
-      try {
-        let perm = await PushNotifications.checkPermissions();
-        if (perm.receive === "prompt") {
-          perm = await PushNotifications.requestPermissions();
-        }
-        if (perm.receive !== "granted") return;
+          await PushNotifications.register();
 
-        await PushNotifications.register();
-
-        PushNotifications.addListener("registration", async (token) => {
-          await updateDoc(doc(db, "users", uid), {
-            fcmToken: token.value,
+          PushNotifications.addListener("registration", async (token) => {
+            await updateDoc(doc(db, "users", uid), {
+              fcmToken: token.value,
+            });
           });
-        });
-      } catch (e) {
-        console.error("Push registration error:", e);
+        } catch (e) {
+          console.error("Push registration error:", e);
+        }
+      } else {
+        // Web Push Registration
+        try {
+          if (!("Notification" in window)) return;
+          const permission = await Notification.requestPermission();
+          if (permission !== "granted") return;
+
+          const { getAppMessaging } = await import("@/lib/firebase");
+          const messaging = await getAppMessaging();
+          if (!messaging) return;
+
+          const { getToken, onMessage } = await import("firebase/messaging");
+          
+          const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
+          if (!vapidKey) {
+            console.warn("NEXT_PUBLIC_FIREBASE_VAPID_KEY is missing. Web push won't work.");
+            return;
+          }
+
+          const currentToken = await getToken(messaging, { vapidKey });
+          if (currentToken) {
+            await updateDoc(doc(db, "users", uid), {
+              fcmToken: currentToken,
+            });
+          }
+
+          onMessage(messaging, (payload) => {
+            console.log("Foreground message received. ", payload);
+            if (payload.notification) {
+               // Show a native browser notification even when app is open (or you can integrate a React Toast here)
+               new Notification(payload.notification.title || "New Message", {
+                 body: payload.notification.body || "",
+               });
+            }
+          });
+        } catch (e) {
+          console.error("Web Push registration error:", e);
+        }
       }
     };
 

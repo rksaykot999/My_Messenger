@@ -37,3 +37,16 @@ export const app = getApps().length
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
+
+export const getAppMessaging = async () => {
+  if (typeof window === "undefined") return null;
+  try {
+    const { getMessaging, isSupported } = await import("firebase/messaging");
+    const supported = await isSupported();
+    if (!supported) return null;
+    return getMessaging(app);
+  } catch (error) {
+    console.warn("Failed to initialize Firebase Messaging", error);
+    return null;
+  }
+};
