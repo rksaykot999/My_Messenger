@@ -116,6 +116,11 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
   const [searchIndex, setSearchIndex] = useState(0);
   const [viewMedia, setViewMedia] = useState<{ url: string; type: "image" | "video" } | null>(null);
   const [needsRead, setNeedsRead] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -302,6 +307,54 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
       });
       setInputText(text);
     }
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
+      mediaRecorder.onstart = () => {
+        setIsRecording(true);
+        setRecordingDuration(0);
+        recordingTimerRef.current = setInterval(() => {
+          setRecordingDuration(prev => prev + 1);
+        }, 1000);
+      };
+
+      mediaRecorder.start();
+    } catch (err) {
+      console.error(err);
+      toast({ title: "Microphone Access Denied", description: "Please allow microphone permissions to record voice messages." });
+    }
+  };
+
+  const stopRecording = (cancel = false) => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.onstop = () => {
+        if (!cancel && audioChunksRef.current.length > 0) {
+          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+          const file = new File([audioBlob], `voice_message_${Date.now()}.webm`, { type: 'audio/webm' });
+          handleAttachmentSelected(file, "audio");
+        }
+      };
+      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+      setIsRecording(false);
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+    }
+  };
+
+  const formatDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   const handleAttachmentSelected = async (
@@ -989,13 +1042,25 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
           <input ref={audioInputRef} type="file" accept="audio/*" className="hidden" onChange={(e) => { handleAttachmentSelected(e.target.files?.[0], "audio"); e.target.value = ""; }} />
           <input ref={gifInputRef} type="file" accept="image/gif" className="hidden" onChange={(e) => { handleAttachmentSelected(e.target.files?.[0], "image"); e.target.value = ""; }} />
 
-          <button type="button" disabled={inputDisabled || isUploading} onClick={() => audioInputRef.current?.click()} className="p-2 shrink-0 text-[#0084ff] hover:bg-white/10 rounded-full transition-colors active:scale-95 disabled:opacity-50">
+          <button type="button" disabled={inputDisabled || isUploading || isRecording} onClick={() => startRecording()} className="p-2 shrink-0 text-[#0084ff] hover:bg-white/10 rounded-full transition-colors active:scale-95 disabled:opacity-50">
              <Mic className="h-5 w-5" />
           </button>
-          <button type="button" disabled={inputDisabled || isUploading} onClick={() => gifInputRef.current?.click()} className="p-2 shrink-0 text-[#0084ff] hover:bg-white/10 rounded-full transition-colors active:scale-95 disabled:opacity-50">
+          <button type="button" disabled={inputDisabled || isUploading || isRecording} onClick={() => toast({ title: "Coming soon", description: "GIF sending is not yet available." })} className="p-2 shrink-0 text-[#0084ff] hover:bg-white/10 rounded-full transition-colors active:scale-95 disabled:opacity-50">
              <div className="font-semibold text-[11px] leading-none text-current opacity-90 tracking-wide border-2 border-current px-1.5 py-0.5 rounded-[5px]">GIF</div>
           </button>
 
+          {isRecording ? (
+            <div className="flex-1 flex items-center justify-between bg-red-500/10 rounded-full px-4 h-10 border border-red-500/30">
+              <div className="flex items-center gap-2 text-red-500">
+                <div className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
+                <span className="text-sm font-semibold tracking-wider">{formatDuration(recordingDuration)}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button type="button" onClick={() => stopRecording(true)} className="text-muted-foreground hover:text-white transition-colors text-xs font-semibold px-2">Cancel</button>
+                <button type="button" onClick={() => stopRecording(false)} className="bg-red-500 hover:bg-red-600 text-white p-1.5 rounded-full transition-colors"><Send className="h-4 w-4" /></button>
+              </div>
+            </div>
+          ) : (
           <div className="relative flex-1 flex items-center bg-[#3A3B3C] rounded-full px-1">
             <Input
               value={inputText}
@@ -1031,8 +1096,9 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
               </PopoverContent>
             </Popover>
           </div>
+          )}
 
-          {inputText.trim() && !inputDisabled ? (
+          {isRecording ? null : inputText.trim() && !inputDisabled ? (
             <button
               onClick={handleSend}
               className="p-2 shrink-0 text-[#0084ff] transition-transform active:scale-95 hover:bg-white/10 rounded-full"

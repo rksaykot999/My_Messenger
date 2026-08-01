@@ -301,7 +301,7 @@ export default function MessengerApp() {
     if (!matchesSearch) return false;
 
     // Exclude users who are blocked by us or have blocked us
-    if (blockedUsers.includes(d.uid) || d.blockedUsers?.includes(user?.uid)) {
+    if (blockedUsers.includes(d.uid) || (user?.uid && d.blockedUsers?.includes(user.uid))) {
       return false;
     }
 
@@ -678,7 +678,7 @@ export default function MessengerApp() {
           quickEmoji: chats.find(c => c.id === activeChatId)?.quickEmoji,
         }}
         isBlocked={blockedUsers.includes(selectedPerson.uid)}
-        amIBlocked={selectedPerson.blockedUsers?.includes(user.uid)}
+        amIBlocked={selectedPerson.blockedUsers?.includes(user?.uid as string)}
         isFriend={myFriends.includes(selectedPerson.uid)}
         onBack={() => {
           if (isMobile && window.history.state?.chatOpen) {
@@ -1697,7 +1697,7 @@ export default function MessengerApp() {
                     quickEmoji: chats.find(c => c.id === activeChatId)?.quickEmoji,
                   }}
                   isBlocked={blockedUsers.includes(selectedPerson.uid)}
-                  amIBlocked={selectedPerson.blockedUsers?.includes(user.uid)}
+                  amIBlocked={selectedPerson.blockedUsers?.includes(user?.uid as string)}
                   isFriend={myFriends.includes(selectedPerson.uid)}
                   onBack={() => setSelectedOtherUid(null)}
                   onCall={(type) => callManager.startCall(
