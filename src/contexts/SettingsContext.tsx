@@ -24,6 +24,7 @@ export interface AppSettings {
   language: string;
   appLockEnabled: boolean;
   appLockPinHash: string | null;
+  accountMode: "public" | "private";
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -35,6 +36,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   language: "English (US)",
   appLockEnabled: false,
   appLockPinHash: null,
+  accountMode: "public",
 };
 
 const LOCAL_KEY = "my-messenger:settings";
@@ -125,6 +127,13 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         if (user) {
           const ref = doc(db, "users", user.uid, "private", "settings");
           setDoc(ref, patch, { merge: true }).catch(() => {});
+
+          // If accountMode is changed, sync it to the main user profile for discovery filtering
+          if (patch.accountMode) {
+            updateDoc(doc(db, "users", user.uid), {
+              accountMode: patch.accountMode,
+            }).catch(() => {});
+          }
         }
         return next;
       });

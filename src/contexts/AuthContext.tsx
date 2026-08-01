@@ -47,6 +47,7 @@ export interface AppUser {
   email: string;
   photoURL: string;
   status: string;
+  accountMode?: "public" | "private";
 }
 
 interface AuthContextValue {
@@ -157,6 +158,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             firebaseUser.photoURL ||
             `https://picsum.photos/seed/${firebaseUser.uid}/200/200`,
           status: "Hey there! I'm using My Messenger.",
+          accountMode: "public",
         });
 
         const userRef = doc(db, "users", firebaseUser.uid);
@@ -185,6 +187,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     friends: [],
                     incomingRequests: [],
                     outgoingRequests: [],
+                    accountMode: "public",
                   }),
             },
             { merge: true }
@@ -212,6 +215,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 firebaseUser.photoURL ||
                 `https://picsum.photos/seed/${firebaseUser.uid}/200/200`,
               status: data.status || "Hey there! I'm using My Messenger.",
+              accountMode: data.accountMode || "public",
             });
           },
           (e) => {
@@ -276,6 +280,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       friends: [],
       incomingRequests: [],
       outgoingRequests: [],
+      accountMode: "public",
     });
   };
 

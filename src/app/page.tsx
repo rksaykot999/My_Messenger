@@ -288,9 +288,16 @@ export default function MessengerApp() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, [selectedOtherUid, selectedGroupId]);
 
-  const filteredDirectory = directory.filter((d) =>
-    d.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredDirectory = directory.filter((d) => {
+    const matchesSearch = d.name.toLowerCase().includes(searchQuery.toLowerCase());
+    if (!matchesSearch) return false;
+
+    // Privacy Logic: Only show private accounts if they are already friends
+    const isFriend = myFriends.includes(d.uid);
+    if (d.accountMode === 'private' && !isFriend) return false;
+
+    return true;
+  });
 
   const pendingRequestPeople = useMemo(
     () => directory.filter((person) => incomingRequests.includes(person.uid)),
@@ -322,8 +329,13 @@ export default function MessengerApp() {
         : activeTab;
   const shouldShowChatSearch = !isMobile || chatSearchOpen;
   const discoverOnlinePeople = useMemo(
-    () => filteredDirectory.filter((person) => person.online).slice(0, 8),
-    [filteredDirectory]
+    () => filteredDirectory.filter((person) => {
+      if (!person.online) return false;
+      const isFriend = myFriends.includes(person.uid);
+      if (person.accountMode === 'private' && !isFriend) return false;
+      return true;
+    }).slice(0, 8),
+    [filteredDirectory, myFriends]
   );
   const discoverSuggestions = useMemo(
     () =>
@@ -331,7 +343,8 @@ export default function MessengerApp() {
         (person) =>
           !myFriends.includes(person.uid) &&
           !incomingRequests.includes(person.uid) &&
-          !outgoingRequests.includes(person.uid)
+          !outgoingRequests.includes(person.uid) &&
+          person.accountMode !== 'private' // Suggestions should only be public people
       ),
     [filteredDirectory, incomingRequests, myFriends, outgoingRequests]
   );
@@ -897,6 +910,29 @@ export default function MessengerApp() {
 
                 {settingsView === 'privacy' && (
                   <div className="space-y-4">
+                    <div className="app-surface p-4 rounded-[28px] space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <Label className="text-base font-semibold">Account Mode</Label>
+                          <p className="text-sm text-muted-foreground">
+                            {settings.accountMode === 'private'
+                              ? 'Private: Only friends can see your profile.'
+                              : 'Public: Everyone can see your profile.'}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                           <span className={cn("text-xs font-medium px-2 py-1 rounded-full",
+                             settings.accountMode === 'private' ? "bg-amber-100 text-amber-700" : "bg-green-100 text-green-700")}>
+                             {settings.accountMode.toUpperCase()}
+                           </span>
+                           <Switch
+                             checked={settings.accountMode === 'private'}
+                             onCheckedChange={(checked) => updateSettings({ accountMode: checked ? 'private' : 'public' })}
+                           />
+                        </div>
+                      </div>
+                    </div>
+
                     <div className="app-surface prose prose-sm text-muted-foreground p-4 rounded-[28px]">
                       <p>At My Messenger, we value your privacy. Messages are stored securely in your Firebase project and only shared with the people you message.</p>
                       <p className="mt-2">We do not sell your data to third parties.</p>

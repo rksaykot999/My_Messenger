@@ -79,14 +79,32 @@ export async function sendDirectPushNotification(
         notification: {
           title,
           body,
+          image: dataPayload.senderPhoto || undefined, // Display sender photo in notification body (Android 10+)
         },
-        data: dataPayload,
+        data: {
+          ...dataPayload,
+          click_action: "FLUTTER_NOTIFICATION_CLICK", // Standard for some plugins, but good for visibility
+          senderPhoto: dataPayload.senderPhoto || "",
+        },
         android: {
           priority: 'high',
+          ttl: '86400s', // 24 hours
           notification: {
             icon: 'ic_stat_message',
             color: '#0f172a',
             default_sound: true,
+            channel_id: 'messages',
+            priority: 'high',
+            visibility: 'public',
+            notification_priority: 'PRIORITY_HIGH',
+          },
+        },
+        apns: {
+          payload: {
+            aps: {
+              sound: 'default',
+              badge: 1,
+            },
           },
         },
       },

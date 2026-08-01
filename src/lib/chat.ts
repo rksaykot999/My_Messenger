@@ -62,6 +62,7 @@ export interface DirectoryUser {
   friends?: string[];
   incomingRequests?: string[];
   outgoingRequests?: string[];
+  accountMode?: "public" | "private";
 }
 
 // Deterministic chat id for a 1:1 conversation between two users.
@@ -182,10 +183,11 @@ export async function sendMessage(
     try {
       const { sendDirectPushNotification } = await import('./fcm');
       
-      // Get sender's name for the title
+      // Get sender's name and photo for the title/icon
       const senderSnap = await getDoc(doc(db, 'users', senderId));
       const senderData = senderSnap.data() as any;
       const senderName = senderData?.name || 'New Message';
+      const senderPhoto = senderData?.photoURL || '';
 
       // Send a push notification to each other participant
       for (const p of participants) {
@@ -198,7 +200,7 @@ export async function sendMessage(
             recipientData.fcmToken,
             senderName,
             previewText,
-            { chatId, senderId }
+            { chatId, senderId, senderName, senderPhoto }
           );
         }
       }
@@ -435,6 +437,7 @@ export function subscribeDirectory(
           friends: u.friends || [],
           incomingRequests: u.incomingRequests || [],
           outgoingRequests: u.outgoingRequests || [],
+          accountMode: u.accountMode || "public",
         }))
     );
   });
