@@ -292,6 +292,11 @@ export default function MessengerApp() {
     const matchesSearch = d.name.toLowerCase().includes(searchQuery.toLowerCase());
     if (!matchesSearch) return false;
 
+    // Exclude users who are blocked by us or have blocked us
+    if (blockedUsers.includes(d.uid) || d.blockedUsers?.includes(user?.uid)) {
+      return false;
+    }
+
     // Privacy Logic: Only show private accounts if they are already friends
     const isFriend = myFriends.includes(d.uid);
     if (d.accountMode === 'private' && !isFriend) return false;

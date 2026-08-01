@@ -364,6 +364,10 @@ export async function deleteGroupChat(chatId: string) {
 export async function blockUser(myUid: string, otherUid: string) {
   await updateDoc(doc(db, "users", myUid), {
     blockedUsers: arrayUnion(otherUid),
+    friends: arrayRemove(otherUid),
+  });
+  await updateDoc(doc(db, "users", otherUid), {
+    friends: arrayRemove(myUid),
   });
 }
 
