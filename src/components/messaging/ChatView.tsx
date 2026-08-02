@@ -455,7 +455,18 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
       }
       setIsUploading(true);
       setUploadProgress(0);
-      const mediaURL = await uploadChatMedia(id, file, setUploadProgress);
+
+      // Create a timeout promise
+      const uploadTimeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Upload timed out after 30 seconds")), 30000)
+      );
+
+      // Race the upload against the timeout
+      const mediaURL = await Promise.race([
+        uploadChatMedia(id, file, setUploadProgress),
+        uploadTimeout
+      ]) as string;
+
       await sendMessage(id, user.uid, type === "image" ? "📷 Photo" : type === "video" ? "🎥 Video" : "🎤 Voice", { type, mediaURL });
     } catch (err: any) {
       console.error("Failed to send attachment. Full error:", err);

@@ -19,7 +19,7 @@ import {
   deleteField,
 } from "firebase/firestore";
 import { db, storage } from "@/lib/firebase";
-import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
+import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { supabase } from "@/lib/supabase";
 
 export interface ChatMessage {
@@ -227,25 +227,22 @@ export async function uploadChatMedia(
   const fileName = `chatMedia/${chatId}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
   const storageRef = ref(storage, fileName);
 
-  return new Promise((resolve, reject) => {
-    const uploadTask = uploadBytesResumable(storageRef, file);
+  try {
+    // onProgress is less granular with uploadBytes (it's basically 0 then 100)
+    // but it's much more reliable against CORS issues in Android WebViews
+    onProgress?.(10);
+    const result = await uploadBytes(storageRef, file);
+    onProgress?.(100);
 
-    uploadTask.on(
-      "state_changed",
-      (snapshot) => {
-        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-        onProgress?.(progress);
-      },
-      (error) => {
-        console.error("Firebase Storage upload error:", error);
-        reject(error);
-      },
-      async () => {
-        const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-        resolve(downloadURL);
-      }
-    );
-  });
+    return await getDownloadURL(result.ref);
+  } catch (error: any) {
+    console.error("Firebase Storage upload error:", error);
+    // Specifically check for CORS/Network issues to help user diagnostics
+    if (error.code === 'storage/unknown' || error.message?.includes('CORS')) {
+      throw new Error("Upload blocked by CORS. Please ensure the storage bucket CORS is configured for 'https://localhost'.");
+    }
+    throw error;
+  }
 }
 
 /** Marks every message from the other participant as "read" (double blue check). */
