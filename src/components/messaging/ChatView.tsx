@@ -111,6 +111,8 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
   const [uploadProgress, setUploadProgress] = useState(0);
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [confirmDeleteMsg, setConfirmDeleteMsg] = useState<ChatMessage | null>(null);
+  const [activeLongPressMsg, setActiveLongPressMsg] = useState<ChatMessage | null>(null);
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchIndex, setSearchIndex] = useState(0);
@@ -311,7 +313,13 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
 
   const startRecording = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        }
+      });
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
@@ -747,9 +755,17 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
             )}
             onTouchStart={(e) => {
               if (msg.deleted || blocked) return;
+              
+              longPressTimerRef.current = setTimeout(() => {
+                setActiveLongPressMsg(msg);
+                if (window.navigator.vibrate) window.navigator.vibrate(50);
+                swipeState.current.isSwiping = false;
+              }, 400);
+
               swipeState.current = { id: msg.id, startX: e.touches[0].clientX, startY: e.touches[0].clientY, isSwiping: false };
             }}
             onTouchMove={(e) => {
+              if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
               if (swipeState.current.id !== msg.id) return;
               const deltaX = e.touches[0].clientX - swipeState.current.startX;
               const deltaY = e.touches[0].clientY - swipeState.current.startY;
@@ -778,6 +794,7 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
               }
             }}
             onTouchEnd={(e) => {
+              if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
               if (swipeState.current.id !== msg.id) return;
               const deltaX = e.changedTouches[0].clientX - swipeState.current.startX;
               
@@ -830,13 +847,14 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
                 )}
                 <div
                   className={cn(
-                    "overflow-hidden text-[15px] leading-relaxed shadow-sm",
-                    msg.type === "image" || msg.type === "video" ? "rounded-[20px] p-1.5" : "px-3.5 py-2",
+                    "text-[15px] leading-relaxed",
                     msg.deleted
-                      ? "rounded-[20px] border border-dashed border-border/60 bg-transparent italic text-muted-foreground"
+                      ? "rounded-[20px] border border-dashed border-border/60 bg-transparent italic text-muted-foreground px-3.5 py-2"
+                      : (msg.type === "image" || msg.type === "video" || msg.type === "audio")
+                      ? "bg-transparent"
                       : mine
-                      ? "rounded-[20px] rounded-br-[4px] bg-[#0084ff] text-white"
-                      : "rounded-[20px] rounded-bl-[4px] bg-[#3E4042] text-[#E4E6EB]"
+                      ? "rounded-[20px] rounded-br-[4px] bg-[#0084ff] text-white px-3.5 py-2 shadow-sm"
+                      : "rounded-[20px] rounded-bl-[4px] bg-[#3E4042] text-[#E4E6EB] px-3.5 py-2 shadow-sm"
                   )}
                 >
                   {msg.deleted ? (
@@ -847,7 +865,7 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
                       <img 
                         src={msg.mediaURL} 
                         alt="Shared photo" 
-                        className="rounded-xl max-h-72 w-auto object-cover" 
+                        className={cn("max-h-72 w-auto object-cover rounded-[20px]", mine ? "rounded-br-[4px]" : "rounded-bl-[4px]")}
                         onLoad={() => {
                           if (bottomRef.current) {
                             bottomRef.current.scrollIntoView({ behavior: 'auto', block: 'end' });
@@ -859,7 +877,7 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
                     </button>
                   ) : msg.type === "video" && msg.mediaURL ? (
                     <button onClick={() => setViewMedia({ url: msg.mediaURL!, type: "video" })} className="relative flex items-center justify-center">
-                      <video src={msg.mediaURL} className="rounded-xl max-h-72 w-auto pointer-events-none" />
+                      <video src={msg.mediaURL} className={cn("max-h-72 w-auto pointer-events-none rounded-[20px]", mine ? "rounded-br-[4px]" : "rounded-bl-[4px]")} />
                       <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/20 hover:bg-black/30 transition-colors">
                         <div className="rounded-full bg-black/50 p-3 text-white backdrop-blur-md">
                           <Film className="h-6 w-6" />
@@ -867,7 +885,7 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
                       </div>
                     </button>
                   ) : msg.type === "audio" && msg.mediaURL ? (
-                    <audio src={msg.mediaURL} controls className="max-w-[200px] h-10" />
+                    <audio src={msg.mediaURL} controls className="w-full max-w-[240px] h-11" style={{ minWidth: '200px' }} />
                   ) : (
                     msg.text
                   )}
@@ -876,7 +894,7 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
 
               {/* Hover actions: react + reply + delete */}
               {!msg.deleted && !blocked && (
-                <div className="flex shrink-0 items-center gap-0.5 opacity-100 md:opacity-0 transition-opacity md:group-hover:opacity-100">
+                <div className="hidden md:flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
                   <Popover>
                     <PopoverTrigger asChild>
                       <button className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-primary">
@@ -1405,6 +1423,32 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Mobile Long Press Context Menu */}
+      <Sheet open={!!activeLongPressMsg} onOpenChange={(open) => !open && setActiveLongPressMsg(null)}>
+        <SheetContent side="bottom" className="rounded-t-3xl p-4 bg-background border-none shadow-2xl z-[100] text-foreground">
+          <SheetHeader className="sr-only">
+            <SheetTitle>Message Options</SheetTitle>
+          </SheetHeader>
+          {activeLongPressMsg && (
+            <div className="flex flex-col gap-2 mt-2">
+               <div className="flex justify-between bg-muted/50 p-3 rounded-full mb-2">
+                 {REACTION_EMOJIS.map((e) => (
+                    <button key={e} onClick={() => { handleReact(activeLongPressMsg, e); setActiveLongPressMsg(null); }} className="text-3xl hover:scale-125 transition-transform active:scale-95">{e}</button>
+                 ))}
+               </div>
+               <Button variant="secondary" className="justify-start gap-3 h-14 rounded-2xl text-base bg-muted/50 hover:bg-muted" onClick={() => { setReplyTo(activeLongPressMsg); setActiveLongPressMsg(null); }}>
+                 <Reply className="h-5 w-5" /> Reply
+               </Button>
+               {activeLongPressMsg.senderId === user?.uid && (
+                 <Button variant="secondary" className="justify-start gap-3 h-14 rounded-2xl text-base text-destructive hover:text-destructive bg-destructive/10 hover:bg-destructive/20" onClick={() => { setConfirmDeleteMsg(activeLongPressMsg); setActiveLongPressMsg(null); }}>
+                   <Trash2 className="h-5 w-5" /> Delete
+                 </Button>
+               )}
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
