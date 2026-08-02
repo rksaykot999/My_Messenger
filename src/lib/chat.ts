@@ -238,9 +238,13 @@ export async function uploadChatMedia(
       else contentType = 'application/octet-stream';
     }
 
+    // Capacitor Android fails to upload Blob/File objects via fetch ("Failed to fetch").
+    // Converting the File to an ArrayBuffer ensures it uploads smoothly on all platforms.
+    const arrayBuffer = await file.arrayBuffer();
+
     const { data, error } = await supabase.storage
       .from('chatMedia')
-      .upload(fileName, file, { 
+      .upload(fileName, arrayBuffer, { 
         contentType,
         cacheControl: '3600',
         upsert: false 
