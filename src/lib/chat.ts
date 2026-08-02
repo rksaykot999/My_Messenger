@@ -223,25 +223,43 @@ export async function uploadChatMedia(
   file: File,
   onProgress?: (percent: number) => void
 ): Promise<string> {
-  const fileExt = file.name.split('.').pop();
-  const fileName = `chatMedia/${chatId}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-  const storageRef = ref(storage, fileName);
-
+  const fileExt = file.name.split('.').pop()?.toLowerCase() || '';
+  const fileName = `${chatId}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+  
   try {
-    // onProgress is less granular with uploadBytes (it's basically 0 then 100)
-    // but it's much more reliable against CORS issues in Android WebViews
     onProgress?.(10);
-    const result = await uploadBytes(storageRef, file);
+    
+    // Explicitly set contentType
+    let contentType = file.type;
+    if (!contentType || contentType === 'application/octet-stream') {
+      if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExt)) contentType = `image/${fileExt === 'jpg' ? 'jpeg' : fileExt}`;
+      else if (['mp4', 'webm', 'mov'].includes(fileExt)) contentType = `video/${fileExt}`;
+      else if (['m4a', 'wav', 'mp3', 'aac', 'ogg'].includes(fileExt)) contentType = `audio/${fileExt}`;
+      else contentType = 'application/octet-stream';
+    }
+
+    const { data, error } = await supabase.storage
+      .from('chatMedia')
+      .upload(fileName, file, { 
+        contentType,
+        cacheControl: '3600',
+        upsert: false 
+      });
+
+    if (error) {
+      throw error;
+    }
+
     onProgress?.(100);
 
-    return await getDownloadURL(result.ref);
+    const { data: publicUrlData } = supabase.storage
+      .from('chatMedia')
+      .getPublicUrl(fileName);
+
+    return publicUrlData.publicUrl;
   } catch (error: any) {
-    console.error("Firebase Storage upload error:", error);
-    // Specifically check for CORS/Network issues to help user diagnostics
-    if (error.code === 'storage/unknown' || error.message?.includes('CORS')) {
-      throw new Error("Upload blocked by CORS. Please ensure the storage bucket CORS is configured for 'https://localhost'.");
-    }
-    throw error;
+    console.error("Supabase Storage upload error:", error);
+    throw new Error(error.message || "Failed to upload media to Supabase.");
   }
 }
 
