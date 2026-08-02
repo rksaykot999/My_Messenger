@@ -251,12 +251,16 @@ export async function uploadChatMedia(
 /** Marks every message from the other participant as "read" (double blue check). */
 export async function markMessagesRead(chatId: string, myUid: string) {
   try {
-    const msgsSnap = await getDocs(collection(db, "chats", chatId, "messages"));
+    const q = query(
+      collection(db, "chats", chatId, "messages"),
+      where("status", "in", ["sent", "delivered"])
+    );
+    const msgsSnap = await getDocs(q);
     const batch = writeBatch(db);
     let any = false;
     msgsSnap.docs.forEach((d) => {
       const data = d.data() as any;
-      if (data.senderId !== myUid && data.status !== "read") {
+      if (data.senderId !== myUid) {
         batch.update(d.ref, { status: "read", readAt: serverTimestamp() });
         any = true;
       }
@@ -270,12 +274,16 @@ export async function markMessagesRead(chatId: string, myUid: string) {
 /** Marks every message from the other participant as at least "delivered". */
 export async function markMessagesDelivered(chatId: string, myUid: string) {
   try {
-    const msgsSnap = await getDocs(collection(db, "chats", chatId, "messages"));
+    const q = query(
+      collection(db, "chats", chatId, "messages"),
+      where("status", "==", "sent")
+    );
+    const msgsSnap = await getDocs(q);
     const batch = writeBatch(db);
     let any = false;
     msgsSnap.docs.forEach((d) => {
       const data = d.data() as any;
-      if (data.senderId !== myUid && data.status === "sent") {
+      if (data.senderId !== myUid) {
         batch.update(d.ref, { status: "delivered" });
         any = true;
       }

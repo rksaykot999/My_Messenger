@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { ArrowLeft, Phone, Video, Plus, Send, Image as ImageIcon, Camera, Film, Info, Trash2, ShieldOff, ShieldCheck, UserRound, Loader2, Mail, Smile, Reply, X, Search, ChevronUp, ChevronDown, MessageSquare, ChevronRight, UserMinus, Download, LogOut, Mic, Pencil } from "lucide-react";
+import { ArrowLeft, Phone, Video, Plus, Send, Image as ImageIcon, Camera as CameraIcon, Film, Info, Trash2, ShieldOff, ShieldCheck, UserRound, Loader2, Mail, Smile, Reply, X, Search, ChevronUp, ChevronDown, MessageSquare, ChevronRight, UserMinus, Download, LogOut, Mic, Pencil } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -57,6 +57,9 @@ import {
 import { clearNotificationsForChat } from "@/lib/notifications";
 import { useToast } from "@/hooks/use-toast";
 import type { Timestamp } from "firebase/firestore";
+import { Capacitor } from "@capacitor/core";
+import { Camera, CameraResultType, CameraSource } from "@capacitor/camera";
+import { VoiceRecorder } from "capacitor-voice-recorder";
 
 interface ChatViewProps {
   chat: {
@@ -330,6 +333,35 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
   };
 
   const startRecording = async () => {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const canRecord = await VoiceRecorder.canDeviceVoiceRecord();
+        if (!canRecord.value) {
+          toast({ title: "Device not supported", description: "Voice recording is not supported on this device." });
+          return;
+        }
+        let permission = await VoiceRecorder.hasAudioRecordingPermission();
+        if (!permission.value) {
+          permission = await VoiceRecorder.requestAudioRecordingPermission();
+        }
+        if (!permission.value) {
+          toast({ title: "Microphone Access Denied", description: "Please allow microphone permissions to record voice messages." });
+          return;
+        }
+
+        await VoiceRecorder.startRecording();
+        setIsRecording(true);
+        setRecordingDuration(0);
+        recordingTimerRef.current = setInterval(() => {
+          setRecordingDuration(prev => prev + 1);
+        }, 1000);
+      } catch (err) {
+        console.error(err);
+        toast({ title: "Failed to start recording", description: "An error occurred." });
+      }
+      return;
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -361,7 +393,28 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
     }
   };
 
-  const stopRecording = (cancel = false) => {
+  const stopRecording = async (cancel = false) => {
+    if (Capacitor.isNativePlatform()) {
+      if (isRecording) {
+        try {
+          const result = await VoiceRecorder.stopRecording();
+          setIsRecording(false);
+          if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+          
+          if (!cancel && result.value && result.value.recordDataBase64) {
+             const response = await fetch(`data:${result.value.mimeType};base64,${result.value.recordDataBase64}`);
+             const audioBlob = await response.blob();
+             const ext = result.value.mimeType.includes('mp4') ? 'm4a' : result.value.mimeType.includes('wav') ? 'wav' : 'webm';
+             const file = new File([audioBlob], `voice_message_${Date.now()}.${ext}`, { type: audioBlob.type });
+             handleAttachmentSelected(file, "audio");
+          }
+        } catch (err) {
+          console.error(err);
+        }
+      }
+      return;
+    }
+
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.onstop = () => {
         if (!cancel && audioChunksRef.current.length > 0) {
@@ -411,6 +464,34 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
     } finally {
       setIsUploading(false);
       setUploadProgress(0);
+    }
+  };
+
+  const handlePickMedia = async (source: 'gallery' | 'camera', mediaType: 'image' | 'video' = 'image') => {
+    if (Capacitor.isNativePlatform() && mediaType === 'image') {
+      try {
+        const image = await Camera.getPhoto({
+          quality: 90,
+          allowEditing: false,
+          resultType: CameraResultType.Uri,
+          source: source === 'gallery' ? CameraSource.Photos : CameraSource.Camera,
+        });
+        if (image.webPath) {
+          const response = await fetch(image.webPath);
+          const blob = await response.blob();
+          const file = new File([blob], `photo_${Date.now()}.${image.format || 'jpeg'}`, { type: `image/${image.format || 'jpeg'}` });
+          handleAttachmentSelected(file, "image");
+        }
+      } catch (err) {
+        console.error("Camera error:", err);
+      }
+    } else {
+      if (source === 'gallery') {
+         if (mediaType === 'image') imageInputRef.current?.click();
+         else videoInputRef.current?.click();
+      } else {
+         if (mediaType === 'image') cameraInputRef.current?.click();
+      }
     }
   };
 
@@ -1054,19 +1135,19 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
             <PopoverContent side="top" align="start" className="w-56 rounded-2xl border-none p-2 shadow-2xl app-surface">
               <div className="grid grid-cols-1 gap-1">
                 <PopoverClose asChild>
-                  <Button variant="ghost" className="justify-start gap-3 h-10" onClick={() => imageInputRef.current?.click()}>
+                  <Button variant="ghost" className="justify-start gap-3 h-10" onClick={() => handlePickMedia('gallery', 'image')}>
                     <ImageIcon className="h-4 w-4 text-blue-500" />
                     <span className="text-sm">Gallery</span>
                   </Button>
                 </PopoverClose>
                 <PopoverClose asChild>
-                  <Button variant="ghost" className="justify-start gap-3 h-10" onClick={() => cameraInputRef.current?.click()}>
-                    <Camera className="h-4 w-4 text-orange-500" />
+                  <Button variant="ghost" className="justify-start gap-3 h-10" onClick={() => handlePickMedia('camera', 'image')}>
+                    <CameraIcon className="h-4 w-4 text-orange-500" />
                     <span className="text-sm">Camera</span>
                   </Button>
                 </PopoverClose>
                 <PopoverClose asChild>
-                  <Button variant="ghost" className="justify-start gap-3 h-10" onClick={() => videoInputRef.current?.click()}>
+                  <Button variant="ghost" className="justify-start gap-3 h-10" onClick={() => handlePickMedia('gallery', 'video')}>
                     <Film className="h-4 w-4 text-purple-500" />
                     <span className="text-sm">Video</span>
                   </Button>

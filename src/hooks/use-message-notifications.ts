@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import type { ChatSummary } from "@/lib/chat";
+import { markMessagesDelivered } from "@/lib/chat";
 import { showMessageNotification, requestNotificationPermission } from "@/lib/notifications";
 import { toast } from "@/hooks/use-toast";
 
@@ -45,9 +46,17 @@ export function useMessageNotifications(
       const previous = lastSeen.current.get(chat.id) ?? ts;
       lastSeen.current.set(chat.id, ts);
 
-      if (isFirstRun) return;
+      if (isFirstRun) {
+        if (chat.unread?.[myUid] && chat.unread[myUid] > 0 && chat.lastSenderId !== myUid) {
+          markMessagesDelivered(chat.id, myUid);
+        }
+        return;
+      }
       if (ts <= previous) return;
       if (chat.lastSenderId === myUid) return;
+      
+      markMessagesDelivered(chat.id, myUid);
+
       if (chat.id === activeChatIdRef.current && document.visibilityState === "visible") return;
       if (!chat.lastMessage) return;
 
