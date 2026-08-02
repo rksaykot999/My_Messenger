@@ -27,6 +27,7 @@ export interface AppSettings {
   accountMode: "public" | "private";
   fontSize: "small" | "medium" | "large";
   fontFamily: "system" | "inter" | "roboto" | "serif" | "mono";
+  themeColor: "blue" | "green" | "purple" | "orange" | "rose";
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -41,6 +42,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   accountMode: "public",
   fontSize: "medium",
   fontFamily: "system",
+  themeColor: "blue",
 };
 
 const LOCAL_KEY = "my-messenger:settings";
@@ -90,6 +92,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     const local = readLocalSettings();
     setSettings(local);
     applyThemeClass(local.theme);
+    if (local.themeColor) {
+      document.documentElement.setAttribute('data-theme-color', local.themeColor);
+    }
     setLoaded(true);
   }, []);
 
@@ -112,6 +117,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
           const merged = { ...DEFAULT_SETTINGS, ...parsed };
           setSettings(merged);
           applyThemeClass(merged.theme);
+          if (merged.themeColor) {
+            document.documentElement.setAttribute('data-theme-color', merged.themeColor);
+          }
           window.localStorage.setItem(LOCAL_KEY, JSON.stringify(merged));
         } else {
           // First time for this user — seed Firestore with local/default settings.
@@ -154,6 +162,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       }
       if (patch.fontFamily) {
         document.documentElement.setAttribute('data-font-family', patch.fontFamily);
+      }
+      if (patch.themeColor) {
+        document.documentElement.setAttribute('data-theme-color', patch.themeColor);
       }
       
       if (user) {

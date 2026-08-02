@@ -6,6 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusIcon } from "./StatusIcon";
+import { GifPicker } from "./GifPicker";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger, PopoverClose } from "@/components/ui/popover";
 import {
@@ -49,6 +50,7 @@ import {
   subscribeChatDoc,
   toggleReaction,
   deleteMessageForEveryone,
+  deleteMessageForMe,
   setQuickEmoji,
   formatLastSeen,
   editMessage,
@@ -467,6 +469,28 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
     }
   };
 
+  const handleGifSelected = async (gifUrl: string) => {
+    if (!user) return;
+    if (blocked) {
+      toast({ title: "You've blocked this user", description: "Unblock them to send media." });
+      return;
+    }
+    let id = chatId;
+    try {
+      if (!id) {
+        id = await ensureChat(user.uid, chat.id);
+        setChatId(id);
+      }
+      await sendMessage(id, user.uid, "GIF", { type: "image", mediaURL: gifUrl });
+    } catch (err: any) {
+      console.error("Failed to send GIF", err);
+      toast({
+        title: "Couldn't send GIF",
+        description: "Please try again.",
+      });
+    }
+  };
+
   const handlePickMedia = async (source: 'gallery' | 'camera', mediaType: 'image' | 'video' = 'image') => {
     if (Capacitor.isNativePlatform() && mediaType === 'image') {
       try {
@@ -585,6 +609,17 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
       await deleteMessageForEveryone(chatId, confirmDeleteMsg.id);
     } catch (err) {
       console.error("Failed to delete message", err);
+      toast({ title: "Couldn't delete message", description: "Please try again." });
+    }
+    setConfirmDeleteMsg(null);
+  };
+
+  const handleDeleteMessageForMe = async () => {
+    if (!chatId || !confirmDeleteMsg || !user) return;
+    try {
+      await deleteMessageForMe(chatId, confirmDeleteMsg.id, user.uid);
+    } catch (err) {
+      console.error("Failed to delete message for me", err);
       toast({ title: "Couldn't delete message", description: "Please try again." });
     }
     setConfirmDeleteMsg(null);
@@ -835,7 +870,7 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
             <p className="mt-1 text-xs text-muted-foreground">This is the beginning of your conversation.</p>
           </div>
         )}
-        {messages.map((msg) => {
+        {messages.filter(msg => !(user && msg.deletedFor?.includes(user.uid))).map((msg) => {
           const mine = msg.senderId === user?.uid;
           const isSearchHit = searchQuery.trim() && !msg.deleted && msg.text?.toLowerCase().includes(searchQuery.trim().toLowerCase());
           const isCurrentHit = searchMatches.length > 0 && messages[searchMatches[Math.min(searchIndex, searchMatches.length - 1)]]?.id === msg.id;
@@ -1023,11 +1058,9 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
                       <Pencil className="h-4 w-4" />
                     </button>
                   )}
-                  {mine && (
-                    <button onClick={() => setConfirmDeleteMsg(msg)} className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-destructive">
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  )}
+                  <button onClick={() => setConfirmDeleteMsg(msg)} className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-destructive">
+                    <Trash2 className="h-4 w-4" />
+                  </button>
                 </div>
               )}
             </div>
@@ -1185,9 +1218,21 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
           <button type="button" disabled={inputDisabled || isUploading || isRecording} onClick={() => startRecording()} className="p-2 shrink-0 text-[#0084ff] hover:bg-white/10 rounded-full transition-colors active:scale-95 disabled:opacity-50">
              <Mic className="h-5 w-5" />
           </button>
-          <button type="button" disabled={inputDisabled || isUploading || isRecording} onClick={() => toast({ title: "Coming soon", description: "GIF sending is not yet available." })} className="p-2 shrink-0 text-[#0084ff] hover:bg-white/10 rounded-full transition-colors active:scale-95 disabled:opacity-50">
-             <div className="font-semibold text-[11px] leading-none text-current opacity-90 tracking-wide border-2 border-current px-1.5 py-0.5 rounded-[5px]">GIF</div>
-          </button>
+          <Popover>
+            <PopoverTrigger asChild>
+              <button type="button" disabled={inputDisabled || isUploading || isRecording} className="p-2 shrink-0 text-[#0084ff] hover:bg-white/10 rounded-full transition-colors active:scale-95 disabled:opacity-50">
+                 <div className="font-semibold text-[11px] leading-none text-current opacity-90 tracking-wide border-2 border-current px-1.5 py-0.5 rounded-[5px]">GIF</div>
+              </button>
+            </PopoverTrigger>
+            <PopoverContent side="top" align="start" className="w-80 rounded-2xl border-none p-2 shadow-2xl app-surface">
+              <GifPicker onSelect={(url: string) => {
+                handleGifSelected(url);
+                // The popover will stay open, users might want to send multiple, but a close mechanism is better
+                // In Radix, you can use a ref to close or just let it close on outside click.
+                document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+              }} />
+            </PopoverContent>
+          </Popover>
 
           {isRecording ? (
             <div className="flex-1 flex items-center justify-between bg-red-500/10 rounded-full px-4 h-10 border border-red-500/30">
@@ -1401,21 +1446,25 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
         </SheetContent>
       </Sheet>
 
-      {/* Delete single message (for everyone) confirmation */}
+      {/* Delete single message confirmation */}
       <AlertDialog open={!!confirmDeleteMsg} onOpenChange={(o) => !o && setConfirmDeleteMsg(null)}>
-        <AlertDialogContent className="rounded-2xl max-w-xs">
-          <AlertDialogHeader>
+        <AlertDialogContent className="rounded-2xl max-w-xs p-5">
+          <AlertDialogHeader className="mb-2">
             <AlertDialogTitle>Delete message?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This message will be removed for everyone in this conversation.
-            </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteMessage} className="rounded-xl bg-destructive hover:bg-destructive/90">
-              Delete for everyone
-            </AlertDialogAction>
-          </AlertDialogFooter>
+          <div className="flex flex-col gap-2">
+            <Button variant="secondary" className="w-full justify-start text-destructive bg-destructive/10 hover:bg-destructive/20 h-12 rounded-xl" onClick={handleDeleteMessageForMe}>
+              Delete for me
+            </Button>
+            {confirmDeleteMsg?.senderId === user?.uid && (
+              <Button variant="secondary" className="w-full justify-start text-destructive bg-destructive/10 hover:bg-destructive/20 h-12 rounded-xl" onClick={handleDeleteMessage}>
+                Delete for everyone
+              </Button>
+            )}
+            <Button variant="outline" className="w-full h-12 rounded-xl mt-1" onClick={() => setConfirmDeleteMsg(null)}>
+              Cancel
+            </Button>
+          </div>
         </AlertDialogContent>
       </AlertDialog>
 
@@ -1567,11 +1616,9 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
                    <Pencil className="h-5 w-5" /> Edit
                  </Button>
                )}
-               {activeLongPressMsg.senderId === user?.uid && (
-                 <Button variant="secondary" className="justify-start gap-3 h-14 rounded-2xl text-base text-destructive hover:text-destructive bg-destructive/10 hover:bg-destructive/20" onClick={() => { setConfirmDeleteMsg(activeLongPressMsg); setActiveLongPressMsg(null); }}>
-                   <Trash2 className="h-5 w-5" /> Delete
-                 </Button>
-               )}
+               <Button variant="secondary" className="justify-start gap-3 h-14 rounded-2xl text-base text-destructive hover:text-destructive bg-destructive/10 hover:bg-destructive/20" onClick={() => { setConfirmDeleteMsg(activeLongPressMsg); setActiveLongPressMsg(null); }}>
+                 <Trash2 className="h-5 w-5" /> Delete
+               </Button>
             </div>
           )}
         </SheetContent>

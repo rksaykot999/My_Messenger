@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { App as CapApp } from '@capacitor/app';
 import { useRouter } from "next/navigation";
 import { onSnapshot, doc, updateDoc } from "firebase/firestore";
 import { db, storage as firebaseStorage } from "@/lib/firebase";
@@ -139,6 +140,45 @@ export default function MessengerApp() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const callManager = useCallManager();
+
+  // Hardware Back Button Handler for Mobile
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const listener = CapApp.addListener('backButton', (info) => {
+      if (selectedOtherUid || selectedGroupId) {
+        setSelectedOtherUid(null);
+        setSelectedGroupId(null);
+        return;
+      }
+      
+      if (activeTab === 'settings' && settingsView !== 'main') {
+        setSettingsView('main');
+        return;
+      }
+      
+      if (activeTab === 'chats' && chatSearchOpen) {
+        setChatSearchOpen(false);
+        setChatSearchQuery('');
+        setChatFilter('all');
+        return;
+      }
+      
+      if (activeTab !== 'chats') {
+        setActiveTab('chats');
+        return;
+      }
+      
+      if (info.canGoBack) {
+        window.history.back();
+      } else {
+        CapApp.exitApp();
+      }
+    });
+
+    return () => {
+      listener.then(l => l.remove());
+    };
+  }, [selectedOtherUid, selectedGroupId, activeTab, settingsView, chatSearchOpen]);
 
   // App Lock: require the PIN once per app load if enabled.
   useEffect(() => {
@@ -990,6 +1030,29 @@ export default function MessengerApp() {
                           checked={settings.theme === 'system'}
                           onCheckedChange={(checked) => updateSettings({ theme: checked ? 'system' : 'light' })}
                         />
+                      </div>
+                    </div>
+                    
+                    <div className="app-surface p-5 rounded-[28px] space-y-4">
+                      <span className="text-sm font-semibold block">Brand Color</span>
+                      <div className="flex items-center gap-4 flex-wrap">
+                        {(['blue', 'green', 'purple', 'orange', 'rose'] as const).map((color) => (
+                          <button
+                            key={color}
+                            onClick={() => updateSettings({ themeColor: color })}
+                            className={cn(
+                              "h-12 w-12 rounded-full flex items-center justify-center transition-all",
+                              settings.themeColor === color ? "ring-2 ring-offset-2 ring-primary scale-110" : "hover:scale-105 opacity-80 hover:opacity-100",
+                              color === 'blue' && "bg-blue-600",
+                              color === 'green' && "bg-green-600",
+                              color === 'purple' && "bg-purple-600",
+                              color === 'orange' && "bg-orange-600",
+                              color === 'rose' && "bg-rose-600"
+                            )}
+                          >
+                            {settings.themeColor === color && <Check className="h-6 w-6 text-white drop-shadow-md" />}
+                          </button>
+                        ))}
                       </div>
                     </div>
                     

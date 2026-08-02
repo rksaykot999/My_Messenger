@@ -35,6 +35,7 @@ export interface ChatMessage {
   deleted?: boolean;
   edited?: boolean;
   readAt?: Timestamp | null;
+  deletedFor?: string[];
 }
 
 export interface ChatSummary {
@@ -367,6 +368,13 @@ export async function deleteMessageForEveryone(chatId: string, messageId: string
     mediaURL: deleteField(),
     reactions: deleteField(),
     replyTo: deleteField(),
+  });
+}
+
+/** Deletes a message for a specific user (hides it from their view only). */
+export async function deleteMessageForMe(chatId: string, messageId: string, uid: string) {
+  await updateDoc(doc(db, "chats", chatId, "messages", messageId), {
+    deletedFor: arrayUnion(uid)
   });
 }
 

@@ -85,6 +85,50 @@
     --font-body: 'Fira Code', monospace;
   }
   
+  html[data-theme-color="green"] {
+    --primary: 142 71% 45%;
+    --ring: 142 71% 45%;
+    --scrollbar-thumb-hover: 142 71% 45%;
+  }
+  html.dark[data-theme-color="green"] {
+    --primary: 142 71% 50%;
+    --ring: 142 71% 50%;
+    --scrollbar-thumb-hover: 142 71% 50%;
+  }
+
+  html[data-theme-color="purple"] {
+    --primary: 262 83% 58%;
+    --ring: 262 83% 58%;
+    --scrollbar-thumb-hover: 262 83% 58%;
+  }
+  html.dark[data-theme-color="purple"] {
+    --primary: 262 83% 65%;
+    --ring: 262 83% 65%;
+    --scrollbar-thumb-hover: 262 83% 65%;
+  }
+
+  html[data-theme-color="orange"] {
+    --primary: 24 98% 50%;
+    --ring: 24 98% 50%;
+    --scrollbar-thumb-hover: 24 98% 50%;
+  }
+  html.dark[data-theme-color="orange"] {
+    --primary: 24 98% 55%;
+    --ring: 24 98% 55%;
+    --scrollbar-thumb-hover: 24 98% 55%;
+  }
+
+  html[data-theme-color="rose"] {
+    --primary: 346 87% 53%;
+    --ring: 346 87% 53%;
+    --scrollbar-thumb-hover: 346 87% 53%;
+  }
+  html.dark[data-theme-color="rose"] {
+    --primary: 346 87% 60%;
+    --ring: 346 87% 60%;
+    --scrollbar-thumb-hover: 346 87% 60%;
+  }
+  
   html {
     color-scheme: light;
   }
