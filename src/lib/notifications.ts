@@ -50,28 +50,44 @@ export function showMessageNotification(opts: {
   // Replace any earlier unread notification for this same chat instead of stacking.
   openNotifications.get(opts.chatId)?.close();
 
-  const notification = new Notification(opts.title, {
-    body: opts.body,
-    icon: opts.icon,
-    tag: opts.chatId,
-  });
+  try {
+    const notification = new Notification(opts.title, {
+      body: opts.body,
+      icon: opts.icon,
+      tag: opts.chatId,
+    });
 
-  notification.onclick = () => {
-    window.focus();
-    opts.onClick?.();
-    notification.close();
-    openNotifications.delete(opts.chatId);
-  };
+    notification.onclick = () => {
+      window.focus();
+      opts.onClick?.();
+      notification.close();
+      openNotifications.delete(opts.chatId);
+    };
 
-  notification.onclose = () => {
-    openNotifications.delete(opts.chatId);
-  };
+    notification.onclose = () => {
+      openNotifications.delete(opts.chatId);
+    };
 
-  openNotifications.set(opts.chatId, notification);
+    openNotifications.set(opts.chatId, notification);
+  } catch (err) {
+    console.warn("Could not show browser notification:", err);
+    // On Chrome Android, new Notification() throws an Illegal Constructor error.
+    // We catch it here to prevent the app from crashing.
+  }
 }
 
 /** Call this when the user actually reads a chat, e.g. by opening it. */
 export function clearNotificationsForChat(chatId: string) {
   openNotifications.get(chatId)?.close();
   openNotifications.delete(chatId);
+
+  if (Capacitor.isNativePlatform()) {
+    import("@capacitor/push-notifications").then(({ PushNotifications }) => {
+      PushNotifications.removeAllDeliveredNotifications().catch(() => {});
+    }).catch(() => {});
+    
+    import("@capacitor/local-notifications").then(({ LocalNotifications }) => {
+      LocalNotifications.removeAllDeliveredNotifications().catch(() => {});
+    }).catch(() => {});
+  }
 }

@@ -123,9 +123,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         onMessage(messaging, (payload) => {
           console.log("Foreground message received. ", payload);
           if (payload.notification) {
-             new Notification(payload.notification.title || "New Message", {
-               body: payload.notification.body || "",
-             });
+             try {
+               new Notification(payload.notification.title || "New Message", {
+                 body: payload.notification.body || "",
+               });
+             } catch (err) {
+               console.warn("Could not show FCM notification", err);
+             }
           }
         });
       } catch (e) {
