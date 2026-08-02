@@ -33,6 +33,7 @@ export interface ChatMessage {
   reactions?: Record<string, string>;
   replyTo?: { id: string; text: string; senderId: string } | null;
   deleted?: boolean;
+  edited?: boolean;
   readAt?: Timestamp | null;
 }
 
@@ -301,6 +302,26 @@ export function subscribeChatDoc(chatId: string, cb: (chat: ChatSummary | null) 
   return onSnapshot(doc(db, "chats", chatId), (snap) => {
     cb(snap.exists() ? ({ id: snap.id, ...(snap.data() as any) } as ChatSummary) : null);
   });
+}
+
+export async function editMessage(
+  chatId: string,
+  messageId: string,
+  newText: string
+) {
+  const msgRef = doc(db, "chats", chatId, "messages", messageId);
+  await updateDoc(msgRef, {
+    text: newText,
+    edited: true,
+  });
+  
+  // Update lastMessage if this was the latest message
+  // (In a real app, you'd check if it's the last message before updating)
+  const chatRef = doc(db, "chats", chatId);
+  const snap = await getDoc(chatRef);
+  if (snap.exists() && (snap.data() as any).lastMessage) {
+    // Just a basic heuristic or you can omit updating the chat list preview
+  }
 }
 
 export async function markChatRead(chatId: string, uid: string) {

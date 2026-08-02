@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { ArrowLeft, Phone, Video, Plus, Send, Image as ImageIcon, Camera, Film, Info, Trash2, ShieldOff, ShieldCheck, UserRound, Loader2, Mail, Smile, Reply, X, Search, ChevronUp, ChevronDown, MessageSquare, ChevronRight, UserMinus, Download, LogOut, Mic } from "lucide-react";
+import { ArrowLeft, Phone, Video, Plus, Send, Image as ImageIcon, Camera, Film, Info, Trash2, ShieldOff, ShieldCheck, UserRound, Loader2, Mail, Smile, Reply, X, Search, ChevronUp, ChevronDown, MessageSquare, ChevronRight, UserMinus, Download, LogOut, Mic, Pencil } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -51,6 +51,7 @@ import {
   deleteMessageForEveryone,
   setQuickEmoji,
   formatLastSeen,
+  editMessage,
   type ChatMessage,
 } from "@/lib/chat";
 import { clearNotificationsForChat } from "@/lib/notifications";
@@ -111,6 +112,7 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
   const [uploadProgress, setUploadProgress] = useState(0);
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [confirmDeleteMsg, setConfirmDeleteMsg] = useState<ChatMessage | null>(null);
+  const [editingMsg, setEditingMsg] = useState<ChatMessage | null>(null);
   const [activeLongPressMsg, setActiveLongPressMsg] = useState<ChatMessage | null>(null);
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -293,6 +295,22 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
 
     const text = inputText;
     setInputText("");
+    
+    if (editingMsg) {
+      setEditingMsg(null);
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      setTypingStatus(id, user.uid, false);
+      try {
+        await editMessage(id, editingMsg.id, text);
+      } catch (err: any) {
+        console.error("Failed to edit message", err);
+        toast({ title: "Message not edited", description: err.message });
+        setInputText(text);
+        setEditingMsg(editingMsg);
+      }
+      return;
+    }
+
     const replySnapshot = replyTo
       ? { id: replyTo.id, text: replyTo.deleted ? "Message deleted" : (replyTo.text || (replyTo.type === "image" ? "📷 Photo" : replyTo.type === "video" ? "🎥 Video" : "")), senderId: replyTo.senderId }
       : null;
@@ -317,7 +335,7 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
-          autoGainControl: true,
+          autoGainControl: false,
         }
       });
       const mediaRecorder = new MediaRecorder(stream);
@@ -919,6 +937,11 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
                   <button onClick={() => setReplyTo(msg)} className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-primary">
                     <Reply className="h-4 w-4" />
                   </button>
+                  {mine && (msg.type === "text" || !msg.type) && (
+                    <button onClick={() => { setEditingMsg(msg); setInputText(msg.text); setTimeout(() => document.querySelector('input')?.focus(), 100); }} className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-primary">
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                  )}
                   {mine && (
                     <button onClick={() => setConfirmDeleteMsg(msg)} className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-destructive">
                       <Trash2 className="h-4 w-4" />
@@ -953,6 +976,7 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
             <div className={cn("flex items-center gap-1.5 mt-1 px-1", !mine && "pl-9")}>
               <span className="text-[10px] text-muted-foreground">
                 {msg.createdAt?.toDate ? msg.createdAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Sending…'}
+                {msg.edited && " (edited)"}
               </span>
               {mine && !msg.deleted && <StatusIcon status={msg.status} />}
             </div>
@@ -985,7 +1009,24 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
           embedded ? "absolute bottom-0 lg:rounded-b-[34px]" : "fixed bottom-0"
         )}
       >
-        {replyTo && (
+        {editingMsg ? (
+          <div className={cn("mb-2 flex items-center gap-2", embedded ? "mx-0" : "max-w-md mx-auto")}>
+            <div className="flex flex-1 items-center gap-2 rounded-2xl border border-primary/20 border-l-2 bg-primary/10 px-3 py-2.5">
+              <Pencil className="h-4 w-4 shrink-0 text-primary" />
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-semibold text-primary">
+                  Editing message
+                </p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {editingMsg.text}
+                </p>
+              </div>
+              <button onClick={() => { setEditingMsg(null); setInputText(""); }} className="rounded-full p-1 text-muted-foreground hover:bg-muted">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        ) : replyTo ? (
           <div className={cn("mb-2 flex items-center gap-2", embedded ? "mx-0" : "max-w-md mx-auto")}>
             <div className="flex flex-1 items-center gap-2 rounded-2xl border border-primary/20 border-l-2 bg-primary/10 px-3 py-2.5">
               <Reply className="h-4 w-4 shrink-0 text-primary" />
@@ -1002,7 +1043,7 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
               </button>
             </div>
           </div>
-        )}
+        ) : null}
         <div className={cn("flex items-end gap-2", embedded ? "mx-0" : "max-w-md mx-auto")}>
           <Popover>
             <PopoverTrigger asChild>
@@ -1440,6 +1481,11 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
                <Button variant="secondary" className="justify-start gap-3 h-14 rounded-2xl text-base bg-muted/50 hover:bg-muted" onClick={() => { setReplyTo(activeLongPressMsg); setActiveLongPressMsg(null); }}>
                  <Reply className="h-5 w-5" /> Reply
                </Button>
+               {activeLongPressMsg.senderId === user?.uid && (activeLongPressMsg.type === "text" || !activeLongPressMsg.type) && (
+                 <Button variant="secondary" className="justify-start gap-3 h-14 rounded-2xl text-base bg-muted/50 hover:bg-muted" onClick={() => { setEditingMsg(activeLongPressMsg); setInputText(activeLongPressMsg.text); setActiveLongPressMsg(null); setTimeout(() => document.querySelector('input')?.focus(), 100); }}>
+                   <Pencil className="h-5 w-5" /> Edit
+                 </Button>
+               )}
                {activeLongPressMsg.senderId === user?.uid && (
                  <Button variant="secondary" className="justify-start gap-3 h-14 rounded-2xl text-base text-destructive hover:text-destructive bg-destructive/10 hover:bg-destructive/20" onClick={() => { setConfirmDeleteMsg(activeLongPressMsg); setActiveLongPressMsg(null); }}>
                    <Trash2 className="h-5 w-5" /> Delete
