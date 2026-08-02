@@ -1033,7 +1033,7 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
                       </div>
                     </button>
                   ) : msg.type === "audio" && msg.mediaURL ? (
-                    <audio src={msg.mediaURL} controls className="w-full max-w-[240px] h-11" style={{ minWidth: '200px' }} />
+                    <audio src={msg.mediaURL} controls className="w-full max-w-[280px] h-11" style={{ minWidth: '240px' }} />
                   ) : (
                     msg.text
                   )}
