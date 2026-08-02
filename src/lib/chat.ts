@@ -224,29 +224,28 @@ export async function uploadChatMedia(
   onProgress?: (percent: number) => void
 ): Promise<string> {
   const fileExt = file.name.split('.').pop();
-  const fileName = `${chatId}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+  const fileName = `chatMedia/${chatId}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+  const storageRef = ref(storage, fileName);
 
-  onProgress?.(10);
+  return new Promise((resolve, reject) => {
+    const uploadTask = uploadBytesResumable(storageRef, file);
 
-  const { data, error } = await supabase.storage
-    .from('chat-media')
-    .upload(fileName, file, {
-      cacheControl: '3600',
-      upsert: false
-    });
-
-  if (error) {
-    console.error("Supabase upload error:", error);
-    throw error;
-  }
-
-  onProgress?.(100);
-
-  const { data: urlData } = supabase.storage
-    .from('chat-media')
-    .getPublicUrl(fileName);
-
-  return urlData.publicUrl;
+    uploadTask.on(
+      "state_changed",
+      (snapshot) => {
+        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+        onProgress?.(progress);
+      },
+      (error) => {
+        console.error("Firebase Storage upload error:", error);
+        reject(error);
+      },
+      async () => {
+        const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+        resolve(downloadURL);
+      }
+    );
+  });
 }
 
 /** Marks every message from the other participant as "read" (double blue check). */

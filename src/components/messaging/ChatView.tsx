@@ -458,10 +458,13 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
       const mediaURL = await uploadChatMedia(id, file, setUploadProgress);
       await sendMessage(id, user.uid, type === "image" ? "📷 Photo" : type === "video" ? "🎥 Video" : "🎤 Voice", { type, mediaURL });
     } catch (err: any) {
-      console.error("Failed to send attachment", err);
+      console.error("Failed to send attachment. Full error:", err);
+      const errorMessage = err?.message || (typeof err === 'string' ? err : "Unknown error");
+      const errorCode = err?.code || "UPLOAD_ERROR";
+
       toast({
         title: "Couldn't send attachment",
-        description: err?.code ? `${err.code}: ${err.message}` : "Please try again.",
+        description: `${errorCode}: ${errorMessage}`,
       });
     } finally {
       setIsUploading(false);
