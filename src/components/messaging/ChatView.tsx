@@ -87,6 +87,9 @@ interface ChatViewProps {
     adminId?: string;
     quickEmoji?: string;
     nickname?: string;
+    location?: string;
+    website?: string;
+    occupation?: string;
   };
   isBlocked?: boolean;
   amIBlocked?: boolean;
@@ -1456,6 +1459,33 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, on
                         <p className="text-sm font-medium truncate">{chat.status || "Empty"}</p>
                       </div>
                     </div>
+                    {chat.location && (
+                      <div className="flex items-center gap-4 p-3 rounded-2xl hover:bg-muted/20 transition-colors">
+                        <UserRound className="h-5 w-5 text-muted-foreground" />
+                        <div className="text-left min-w-0 flex-1">
+                          <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Location</p>
+                          <p className="text-sm font-medium truncate">{chat.location}</p>
+                        </div>
+                      </div>
+                    )}
+                    {chat.website && (
+                      <div className="flex items-center gap-4 p-3 rounded-2xl hover:bg-muted/20 transition-colors">
+                        <Search className="h-5 w-5 text-muted-foreground" />
+                        <div className="text-left min-w-0 flex-1">
+                          <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Website</p>
+                          <p className="text-sm font-medium truncate">{chat.website}</p>
+                        </div>
+                      </div>
+                    )}
+                    {chat.occupation && (
+                      <div className="flex items-center gap-4 p-3 rounded-2xl hover:bg-muted/20 transition-colors">
+                        <Info className="h-5 w-5 text-muted-foreground" />
+                        <div className="text-left min-w-0 flex-1">
+                          <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Occupation</p>
+                          <p className="text-sm font-medium truncate">{chat.occupation}</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -1470,26 +1500,27 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, on
                     </div>
                     <ChevronRight className="h-4 w-4 text-muted-foreground" />
                   </button>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <button className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-muted/20 transition-colors">
-                        <div className="flex items-center gap-3 text-primary">
-                          <div className="flex items-center justify-center w-5 h-5 text-xl leading-none">{chat.quickEmoji || "👍"}</div>
-                          <span className="text-sm font-medium">Change Quick Emoji</span>
-                        </div>
-                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                      </button>
-                    </PopoverTrigger>
-                    <PopoverContent side="bottom" align="center" className="w-auto p-0 border-none shadow-2xl bg-transparent z-[110]">
-                      <EmojiPicker
-                        onEmojiClick={(emojiData) => {
-                          handleChangeQuickEmoji(emojiData.emoji);
-                          setContactInfoOpen(false);
-                        }}
-                        theme={settings.theme === 'dark' ? Theme.DARK : Theme.LIGHT}
-                      />
-                    </PopoverContent>
-                  </Popover>
+                  {!chat.isGroup && (
+                    <>
+                      {isFriend ? (
+                        <button onClick={() => { setContactInfoOpen(false); setConfirmUnfriend(true); }} className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-destructive/10 transition-colors">
+                          <div className="flex items-center gap-3 text-destructive">
+                            <UserMinus className="h-5 w-5" />
+                            <span className="text-sm font-medium text-destructive">Unfriend</span>
+                          </div>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        </button>
+                      ) : (
+                        <button onClick={() => { setContactInfoOpen(false); onAddFriend?.(); }} className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-primary/10 transition-colors">
+                          <div className="flex items-center gap-3 text-primary">
+                            <Plus className="h-5 w-5" />
+                            <span className="text-sm font-medium text-primary">Add Friend</span>
+                          </div>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        </button>
+                      )}
+                    </>
+                  )}
                   {!chat.isGroup ? (
                     <button onClick={() => { setContactInfoOpen(false); setConfirmDelete(true); }} className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-destructive/10 transition-colors">
                       <div className="flex items-center gap-3 text-destructive">

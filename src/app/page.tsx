@@ -707,7 +707,8 @@ export default function MessengerApp() {
 
   if (selectedPerson && isMobile) {
     return (
-      <ChatView
+      <div className="fixed inset-0 flex flex-col h-[100dvh] w-full overflow-hidden">
+        <ChatView
         chat={{
           id: selectedPerson.uid,
           name: selectedPerson.name,
@@ -717,7 +718,10 @@ export default function MessengerApp() {
           email: selectedPerson.email,
           lastSeen: selectedPerson.lastSeen,
           quickEmoji: chats.find(c => c.id === activeChatId)?.quickEmoji,
-          nickname: chats.find(c => c.id === activeChatId)?.nicknames?.[selectedPerson.uid]
+          nickname: chats.find(c => c.id === activeChatId)?.nicknames?.[selectedPerson.uid],
+          location: selectedPerson.location,
+          website: selectedPerson.website,
+          occupation: selectedPerson.occupation
         }}
         isBlocked={blockedUsers.includes(selectedPerson.uid)}
         amIBlocked={selectedPerson.blockedUsers?.includes(user?.uid as string)}
@@ -743,10 +747,12 @@ export default function MessengerApp() {
         )}
         onAddFriend={() => handleSendFriendRequest(selectedPerson.uid)}
       />
+      </div>
     );
   } else if (selectedGroupChat && isMobile) {
     return (
-      <ChatView
+      <div className="fixed inset-0 flex flex-col h-[100dvh] w-full overflow-hidden">
+        <ChatView
         chat={{
           id: selectedGroupChat.id,
           name: selectedGroupChat.groupName || 'Group Chat',
@@ -771,6 +777,7 @@ export default function MessengerApp() {
           }
         }}
       />
+      </div>
     );
   }
 
@@ -1769,7 +1776,10 @@ export default function MessengerApp() {
                     email: selectedPerson.email,
                     lastSeen: selectedPerson.lastSeen,
                     quickEmoji: chats.find(c => c.id === activeChatId)?.quickEmoji,
-                    nickname: chats.find(c => c.id === activeChatId)?.nicknames?.[selectedPerson.uid]
+                    nickname: chats.find(c => c.id === activeChatId)?.nicknames?.[selectedPerson.uid],
+                    location: selectedPerson.location,
+                    website: selectedPerson.website,
+                    occupation: selectedPerson.occupation
                   }}
                   isBlocked={blockedUsers.includes(selectedPerson.uid)}
                   amIBlocked={selectedPerson.blockedUsers?.includes(user?.uid as string)}
