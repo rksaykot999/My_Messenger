@@ -62,6 +62,15 @@ import type { Timestamp } from "firebase/firestore";
 import { Capacitor } from "@capacitor/core";
 import { Camera, CameraResultType, CameraSource } from "@capacitor/camera";
 import { VoiceRecorder } from "capacitor-voice-recorder";
+import dynamic from "next/dynamic";
+import { Theme } from "emoji-picker-react";
+
+const EmojiPicker = dynamic(
+  () => {
+    return import('emoji-picker-react');
+  },
+  { ssr: false }
+);
 
 interface ChatViewProps {
   chat: {
@@ -244,19 +253,22 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
     };
   }, [needsRead, chatId, user, settings.readReceipts]);
 
+  const scrollToBottom = useCallback((smooth = false) => {
+    if (bottomRef.current) {
+      bottomRef.current.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'end' });
+    } else if (scrollRef.current) {
+      scrollRef.current.scrollTo({
+        top: scrollRef.current.scrollHeight,
+        behavior: smooth ? 'smooth' : 'auto'
+      });
+    }
+  }, []);
+
   useEffect(() => {
-    const scrollToBottom = () => {
-      if (bottomRef.current) {
-        bottomRef.current.scrollIntoView({ behavior: 'auto', block: 'end' });
-      } else if (scrollRef.current) {
-        scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-      }
-    };
-    
     scrollToBottom();
-    const timeoutId = setTimeout(scrollToBottom, 150);
+    const timeoutId = setTimeout(() => scrollToBottom(), 150);
     return () => clearTimeout(timeoutId);
-  }, [messages, otherTyping]);
+  }, [messages, otherTyping, scrollToBottom]);
 
   // Clear my typing flag when leaving the conversation.
   useEffect(() => {
@@ -748,7 +760,7 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
                       <span className="text-sm font-semibold">Change Quick Emoji</span>
                     </button>
                   </PopoverTrigger>
-                  <PopoverContent side="left" align="start" className="w-72 rounded-2xl border-none p-3 shadow-2xl app-surface">
+                  <PopoverContent side="bottom" align="center" className="w-72 rounded-2xl border-none p-3 shadow-2xl app-surface z-[110]">
                      <div className="mb-2 text-xs font-semibold text-muted-foreground px-1">Quick Message</div>
                      <div className="grid grid-cols-8 gap-1">
                         {PICKER_EMOJIS.map((e) => (
@@ -834,7 +846,7 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
             value={searchQuery}
             onChange={(e) => { setSearchQuery(e.target.value); setSearchIndex(0); }}
             placeholder="Search in conversation"
-            className="h-8 flex-1 border-none bg-transparent px-0 focus-visible:ring-0"
+            className="h-8 flex-1 border-none bg-transparent pl-2 pr-0 focus-visible:ring-0"
           />
           {searchQuery.trim() && (
             <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
@@ -1061,6 +1073,21 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
                             </button>
                           </PopoverClose>
                         ))}
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <button className="rounded-full p-1.5 text-lg transition-transform hover:scale-125 bg-muted/50 text-muted-foreground flex items-center justify-center">
+                              <Plus className="h-4 w-4" />
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent side="top" align="center" className="w-auto p-0 border-none shadow-2xl bg-transparent">
+                            <EmojiPicker 
+                              onEmojiClick={(emojiData) => {
+                                handleReact(msg, emojiData.emoji);
+                              }}
+                              theme={settings.theme === 'dark' ? Theme.DARK : Theme.LIGHT}
+                            />
+                          </PopoverContent>
+                        </Popover>
                       </div>
                     </PopoverContent>
                   </Popover>
@@ -1265,6 +1292,10 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
               value={inputText}
               onChange={(e) => handleInputChange(e.target.value)}
               onKeyDown={handleKeyPress}
+              onFocus={() => {
+                // When focusing, keyboard might take a moment to appear
+                setTimeout(() => scrollToBottom(true), 300);
+              }}
               placeholder={isBlocked ? "You've blocked this user" : amIBlocked ? "You cannot reply to this conversation" : "Aa"}
               disabled={inputDisabled}
               className="flex-1 bg-transparent border-0 focus-visible:ring-0 text-[#E4E6EB] placeholder:text-[#B0B3B8] h-10 px-3 shadow-none focus-visible:ring-offset-0 disabled:opacity-50"
@@ -1393,7 +1424,7 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
                         <ChevronRight className="h-4 w-4 text-muted-foreground" />
                       </button>
                     </PopoverTrigger>
-                    <PopoverContent side="top" align="center" className="w-72 rounded-2xl border-none p-3 shadow-2xl app-surface z-[100]">
+                    <PopoverContent side="bottom" align="center" className="w-72 rounded-2xl border-none p-3 shadow-2xl app-surface z-[110]">
                        <div className="mb-2 text-xs font-semibold text-muted-foreground px-1">Quick Message</div>
                        <div className="grid grid-cols-8 gap-1">
                           {PICKER_EMOJIS.map((e) => (
@@ -1617,10 +1648,26 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
           </SheetHeader>
           {activeLongPressMsg && (
             <div className="flex flex-col gap-2 mt-2">
-               <div className="flex justify-between bg-muted/50 p-3 rounded-full mb-2">
+               <div className="flex justify-between items-center bg-muted/50 p-3 rounded-full mb-2">
                  {REACTION_EMOJIS.map((e) => (
                     <button key={e} onClick={() => { handleReact(activeLongPressMsg, e); setActiveLongPressMsg(null); }} className="text-3xl hover:scale-125 transition-transform active:scale-95">{e}</button>
                  ))}
+                 <Popover>
+                    <PopoverTrigger asChild>
+                      <button className="text-xl hover:scale-125 transition-transform active:scale-95 bg-muted/50 text-muted-foreground flex items-center justify-center rounded-full w-10 h-10">
+                        <Plus className="h-6 w-6" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent side="top" align="center" className="w-auto p-0 border-none shadow-2xl bg-transparent z-[110]">
+                      <EmojiPicker 
+                        onEmojiClick={(emojiData) => {
+                          handleReact(activeLongPressMsg, emojiData.emoji);
+                          setActiveLongPressMsg(null);
+                        }}
+                        theme={settings.theme === 'dark' ? Theme.DARK : Theme.LIGHT}
+                      />
+                    </PopoverContent>
+                 </Popover>
                </div>
                <Button variant="secondary" className="justify-start gap-3 h-14 rounded-2xl text-base bg-muted/50 hover:bg-muted" onClick={() => { setReplyTo(activeLongPressMsg); setActiveLongPressMsg(null); }}>
                  <Reply className="h-5 w-5" /> Reply
