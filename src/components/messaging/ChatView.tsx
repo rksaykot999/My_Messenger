@@ -94,6 +94,7 @@ interface ChatViewProps {
   isBlocked?: boolean;
   amIBlocked?: boolean;
   isFriend?: boolean;
+  hasHistory?: boolean;
   isRequestSent?: boolean;
   isRequestReceived?: boolean;
   onBack?: () => void;
@@ -121,6 +122,7 @@ export function ChatView({
   isFriend, 
   isRequestSent,
   isRequestReceived,
+  hasHistory,
   onBack, 
   onCall, 
   onLeaveGroup, 
@@ -149,7 +151,7 @@ export function ChatView({
   const [newNickname, setNewNickname] = useState("");
   
   // Combine blocked states for inputs
-  const inputDisabled = isBlocked || amIBlocked || (!chat.isGroup && !isFriend);
+  const inputDisabled = isBlocked || amIBlocked || (!chat.isGroup && !isFriend && !hasHistory);
   const [blocked, setBlocked] = useState(!!isBlocked);
   const [otherTyping, setOtherTyping] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -1431,7 +1433,7 @@ export function ChatView({
                 // When focusing, keyboard might take a moment to appear
                 setTimeout(() => scrollToBottom(true), 300);
               }}
-              placeholder={isBlocked ? "You've blocked this user" : amIBlocked ? "You cannot reply" : (!chat.isGroup && !isFriend) ? "Must be friends to message" : "Aa"}
+              placeholder={isBlocked ? "You've blocked this user" : amIBlocked ? "You cannot reply to this conversation" : (!chat.isGroup && !isFriend && !hasHistory) ? "You must be friends to message" : "Aa"}
               disabled={inputDisabled}
               className="flex-1 bg-transparent border-0 focus-visible:ring-0 text-[#E4E6EB] placeholder:text-[#B0B3B8] h-10 pl-4 pr-3 shadow-none focus-visible:ring-offset-0 disabled:opacity-50 text-[15px]"
             />

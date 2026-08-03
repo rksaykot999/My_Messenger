@@ -726,6 +726,7 @@ export default function MessengerApp() {
           isBlocked={blockedUsers.includes(selectedPerson.uid)}
           amIBlocked={selectedPerson.blockedUsers?.includes(user?.uid as string)}
           isFriend={myFriends.includes(selectedPerson.uid)}
+          hasHistory={!!chats.find(c => c.id === activeChatId)?.lastMessage}
           isRequestSent={outgoingRequests.includes(selectedPerson.uid)}
           isRequestReceived={incomingRequests.includes(selectedPerson.uid)}
           onCancelRequest={() => handleCancelFriendRequest(selectedPerson.uid)}
@@ -1788,6 +1789,7 @@ export default function MessengerApp() {
                   isBlocked={blockedUsers.includes(selectedPerson.uid)}
                   amIBlocked={selectedPerson.blockedUsers?.includes(user?.uid as string)}
                   isFriend={myFriends.includes(selectedPerson.uid)}
+                  hasHistory={!!chats.find(c => c.id === activeChatId)?.lastMessage}
                   isRequestSent={outgoingRequests.includes(selectedPerson.uid)}
                   isRequestReceived={incomingRequests.includes(selectedPerson.uid)}
                   onCancelRequest={() => handleCancelFriendRequest(selectedPerson.uid)}
