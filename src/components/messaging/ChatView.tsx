@@ -514,7 +514,7 @@ export function ChatView({
 
       // Create a timeout promise
       const uploadTimeout = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Upload timed out after 30 seconds")), 30000)
+        setTimeout(() => reject(new Error("Upload timed out after 1 minute")), 60000)
       );
 
       // Race the upload against the timeout
