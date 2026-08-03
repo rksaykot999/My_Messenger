@@ -161,11 +161,11 @@ export default function MessengerApp() {
 
       // 2. Global modals in page.tsx
       if (isProfileEditing || reauthOpen || confirmDeleteChat || activeLongPressChat) {
-         setIsProfileEditing(false);
-         setReauthOpen(false);
-         setConfirmDeleteChat(null);
-         setActiveLongPressChat(null);
-         return;
+        setIsProfileEditing(false);
+        setReauthOpen(false);
+        setConfirmDeleteChat(null);
+        setActiveLongPressChat(null);
+        return;
       }
 
       // 3. Sub-screens
@@ -372,9 +372,11 @@ export default function MessengerApp() {
       return false;
     }
 
-    // Privacy Logic: Only show private accounts if they are already friends
-    const isFriend = myFriends.includes(d.uid);
-    if (d.accountMode === 'private' && !isFriend) return false;
+    // Do not show people we are already friends with
+    if (myFriends.includes(d.uid)) return false;
+
+    // Privacy Logic: Do not show private accounts (since they are not friends)
+    if (d.accountMode === 'private') return false;
 
     return true;
   });
@@ -384,8 +386,8 @@ export default function MessengerApp() {
     [directory, incomingRequests]
   );
 
-  const onlineFriends = useMemo(
-    () => directory.filter((person) => myFriends.includes(person.uid) && person.online),
+  const friendsList = useMemo(
+    () => directory.filter((person) => myFriends.includes(person.uid)),
     [directory, myFriends]
   );
 
@@ -937,7 +939,7 @@ export default function MessengerApp() {
 
             <div className="mt-8 pb-4 text-center">
               <p className="text-xs font-medium text-muted-foreground/50 uppercase tracking-widest">Version</p>
-              <p className="text-sm font-semibold text-muted-foreground/70">My Messenger v1.3</p>
+              <p className="text-sm font-semibold text-muted-foreground/70">My Messenger v1.4</p>
             </div>
           </div>
         </>
@@ -1456,14 +1458,14 @@ export default function MessengerApp() {
                   )}
 
 
-                  {/* Active Now - Horizontal Scroll */}
-                  {onlineFriends.length > 0 && !chatSearchQuery && (
+                  {/* Friends - Horizontal Scroll */}
+                  {friendsList.length > 0 && !chatSearchQuery && (
                     <div className="space-y-3">
                       <div className="flex items-center justify-between px-1">
-                        <h3 className="text-sm font-semibold text-muted-foreground">Active Now</h3>
+                        <h3 className="text-sm font-semibold text-muted-foreground">Friends</h3>
                       </div>
                       <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-none">
-                        {onlineFriends.map((person) => (
+                        {friendsList.map((person) => (
                           <button
                             key={person.uid}
                             onClick={() => openConversation(person.uid)}
@@ -1474,7 +1476,9 @@ export default function MessengerApp() {
                                 <AvatarImage src={person.photoURL} />
                                 <AvatarFallback>{person.name[0]}</AvatarFallback>
                               </Avatar>
-                              <div className="absolute bottom-0.5 right-0.5 h-3.5 w-3.5 rounded-full border-2 border-background bg-emerald-500" />
+                              {person.online && (
+                                <div className="absolute bottom-0.5 right-0.5 h-3.5 w-3.5 rounded-full border-2 border-background bg-emerald-500" />
+                              )}
                             </div>
                             <span className="w-full truncate text-center text-xs font-medium text-foreground">{person.name.split(' ')[0]}</span>
                           </button>
@@ -1943,9 +1947,9 @@ export default function MessengerApp() {
               }}>
                 <MessageSquare className="h-5 w-5" /> Open Chat
               </Button>
-              <Button variant="secondary" className="justify-start gap-3 h-14 rounded-2xl text-base bg-muted/50 hover:bg-muted" onClick={() => { 
-                toast({ title: "Chat muted" }); 
-                setActiveLongPressChat(null); 
+              <Button variant="secondary" className="justify-start gap-3 h-14 rounded-2xl text-base bg-muted/50 hover:bg-muted" onClick={() => {
+                toast({ title: "Chat muted" });
+                setActiveLongPressChat(null);
               }}>
                 <VolumeX className="h-5 w-5" /> Mute
               </Button>
@@ -1963,7 +1967,7 @@ export default function MessengerApp() {
                 </Button>
               )}
               {!activeLongPressChat.isGroup && activeLongPressChat.otherUid && (
-                <Button variant="secondary" className="justify-start gap-3 h-14 rounded-2xl text-base bg-muted/50 hover:bg-muted" onClick={async () => {
+                <Button variant="secondary" className="justify-start gap-3 h-14 rounded-2xl text-base bg-muted/50 hover:bg-muted text-destructive hover:text-destructive" onClick={async () => {
                   try {
                     await blockUser(user!.uid, activeLongPressChat.otherUid);
                     toast({ title: "User blocked" });
@@ -2117,7 +2121,7 @@ export default function MessengerApp() {
                 setReauthSubmitting(true);
                 try {
                   await login(reauthEmail, reauthPassword);
-                  await finishDeleteAccount();
+                  await deleteAccount();
                   setReauthOpen(false);
                   router.replace('/login');
                 } catch (err: any) {
@@ -2141,7 +2145,7 @@ export default function MessengerApp() {
                 setReauthSubmitting(true);
                 try {
                   await loginWithGoogle();
-                  await finishDeleteAccount();
+                  await deleteAccount();
                   setReauthOpen(false);
                   router.replace('/login');
                 } catch (err) {
@@ -2179,7 +2183,7 @@ export default function MessengerApp() {
             <div className="grid gap-2">
               <Label>Select Friends</Label>
               <div className="max-h-[200px] overflow-y-auto space-y-2 border rounded-md p-2">
-                {onlineFriends.length === 0 && myFriends.length === 0 ? (
+                {myFriends.length === 0 ? (
                   <p className="text-sm text-muted-foreground p-2 text-center">No friends available to add.</p>
                 ) : (
                   myFriends.map((friendUid) => {
