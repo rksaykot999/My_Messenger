@@ -138,6 +138,7 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, on
   const [confirmDeleteMsg, setConfirmDeleteMsg] = useState<ChatMessage | null>(null);
   const [editingMsg, setEditingMsg] = useState<ChatMessage | null>(null);
   const [activeLongPressMsg, setActiveLongPressMsg] = useState<ChatMessage | null>(null);
+  const [showMobileEmoji, setShowMobileEmoji] = useState(false);
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -280,6 +281,16 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, on
     const timeoutId = setTimeout(() => scrollToBottom(), 150);
     return () => clearTimeout(timeoutId);
   }, [messages, otherTyping, scrollToBottom]);
+
+  // Handle window resize (e.g. mobile keyboard opening)
+  useEffect(() => {
+    const handleResize = () => {
+      setTimeout(() => scrollToBottom(true), 100);
+      setTimeout(() => scrollToBottom(true), 300);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [scrollToBottom]);
 
   // Clear my typing flag when leaving the conversation.
   useEffect(() => {
@@ -953,11 +964,18 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, on
               mine ? "ml-auto items-end" : "items-start",
               isSearchHit && !isCurrentHit && "ring-1 ring-accent/40"
             )}
+            onContextMenu={(e) => {
+              // Prevent default context menu to allow custom long press
+              if (window.innerWidth < 768) {
+                e.preventDefault();
+              }
+            }}
             onTouchStart={(e) => {
               if (msg.deleted || blocked) return;
               
               longPressTimerRef.current = setTimeout(() => {
                 setActiveLongPressMsg(msg);
+                setShowMobileEmoji(false);
                 if (window.navigator.vibrate) window.navigator.vibrate(50);
                 swipeState.current.isSwiping = false;
               }, 400);
@@ -1712,45 +1730,53 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, on
       </Dialog>
 
       {/* Mobile Long Press Context Menu */}
-      <Sheet open={!!activeLongPressMsg} onOpenChange={(open) => !open && setActiveLongPressMsg(null)}>
+      <Sheet open={!!activeLongPressMsg} onOpenChange={(open) => {
+        if (!open) {
+          setActiveLongPressMsg(null);
+          setTimeout(() => setShowMobileEmoji(false), 200);
+        }
+      }}>
         <SheetContent side="bottom" className="rounded-t-3xl p-4 bg-background border-none shadow-2xl z-[100] text-foreground">
           <SheetHeader className="sr-only">
             <SheetTitle>Message Options</SheetTitle>
           </SheetHeader>
           {activeLongPressMsg && (
             <div className="flex flex-col gap-2 mt-2">
-               <div className="flex justify-between items-center bg-muted/50 p-3 rounded-full mb-2">
-                 {REACTION_EMOJIS.map((e) => (
-                    <button key={e} onClick={() => { handleReact(activeLongPressMsg, e); setActiveLongPressMsg(null); }} className="text-3xl hover:scale-125 transition-transform active:scale-95">{e}</button>
-                 ))}
-                 <Popover>
-                    <PopoverTrigger asChild>
-                      <button className="text-xl hover:scale-125 transition-transform active:scale-95 bg-muted/50 text-muted-foreground flex items-center justify-center rounded-full w-10 h-10">
-                        <Plus className="h-6 w-6" />
-                      </button>
-                    </PopoverTrigger>
-                    <PopoverContent side="top" align="center" className="w-auto p-0 border-none shadow-2xl bg-transparent z-[110]">
-                      <EmojiPicker 
-                        onEmojiClick={(emojiData) => {
-                          handleReact(activeLongPressMsg, emojiData.emoji);
-                          setActiveLongPressMsg(null);
-                        }}
-                        theme={settings.theme === 'dark' ? Theme.DARK : Theme.LIGHT}
-                      />
-                    </PopoverContent>
-                 </Popover>
-               </div>
-               <Button variant="secondary" className="justify-start gap-3 h-14 rounded-2xl text-base bg-muted/50 hover:bg-muted" onClick={() => { setReplyTo(activeLongPressMsg); setActiveLongPressMsg(null); }}>
-                 <Reply className="h-5 w-5" /> Reply
-               </Button>
-               {activeLongPressMsg.senderId === user?.uid && (activeLongPressMsg.type === "text" || !activeLongPressMsg.type) && (
-                 <Button variant="secondary" className="justify-start gap-3 h-14 rounded-2xl text-base bg-muted/50 hover:bg-muted" onClick={() => { setEditingMsg(activeLongPressMsg); setInputText(activeLongPressMsg.text); setActiveLongPressMsg(null); setTimeout(() => document.querySelector('input')?.focus(), 100); }}>
-                   <Pencil className="h-5 w-5" /> Edit
-                 </Button>
+               {showMobileEmoji ? (
+                 <div className="flex flex-col items-center">
+                    <EmojiPicker 
+                      onEmojiClick={(emojiData) => {
+                        handleReact(activeLongPressMsg, emojiData.emoji);
+                        setActiveLongPressMsg(null);
+                        setShowMobileEmoji(false);
+                      }}
+                      theme={settings.theme === 'dark' ? Theme.DARK : Theme.LIGHT}
+                    />
+                    <Button variant="ghost" className="w-full mt-2" onClick={() => setShowMobileEmoji(false)}>Back</Button>
+                 </div>
+               ) : (
+                 <>
+                   <div className="flex justify-between items-center bg-muted/50 p-3 rounded-full mb-2">
+                     {REACTION_EMOJIS.map((e) => (
+                        <button key={e} onClick={() => { handleReact(activeLongPressMsg, e); setActiveLongPressMsg(null); }} className="text-3xl hover:scale-125 transition-transform active:scale-95">{e}</button>
+                     ))}
+                     <button onClick={() => setShowMobileEmoji(true)} className="text-xl hover:scale-125 transition-transform active:scale-95 bg-muted/50 text-muted-foreground flex items-center justify-center rounded-full w-10 h-10">
+                       <Plus className="h-6 w-6" />
+                     </button>
+                   </div>
+                   <Button variant="secondary" className="justify-start gap-3 h-14 rounded-2xl text-base bg-muted/50 hover:bg-muted" onClick={() => { setReplyTo(activeLongPressMsg); setActiveLongPressMsg(null); }}>
+                     <Reply className="h-5 w-5" /> Reply
+                   </Button>
+                   {activeLongPressMsg.senderId === user?.uid && (activeLongPressMsg.type === "text" || !activeLongPressMsg.type) && (
+                     <Button variant="secondary" className="justify-start gap-3 h-14 rounded-2xl text-base bg-muted/50 hover:bg-muted" onClick={() => { setEditingMsg(activeLongPressMsg); setInputText(activeLongPressMsg.text); setActiveLongPressMsg(null); setTimeout(() => document.querySelector('input')?.focus(), 100); }}>
+                       <Pencil className="h-5 w-5" /> Edit
+                     </Button>
+                   )}
+                   <Button variant="secondary" className="justify-start gap-3 h-14 rounded-2xl text-base text-destructive hover:text-destructive bg-destructive/10 hover:bg-destructive/20" onClick={() => { setConfirmDeleteMsg(activeLongPressMsg); setActiveLongPressMsg(null); }}>
+                     <Trash2 className="h-5 w-5" /> Delete
+                   </Button>
+                 </>
                )}
-               <Button variant="secondary" className="justify-start gap-3 h-14 rounded-2xl text-base text-destructive hover:text-destructive bg-destructive/10 hover:bg-destructive/20" onClick={() => { setConfirmDeleteMsg(activeLongPressMsg); setActiveLongPressMsg(null); }}>
-                 <Trash2 className="h-5 w-5" /> Delete
-               </Button>
             </div>
           )}
           {/* Edit Nickname Dialog */}
