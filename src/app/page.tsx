@@ -726,6 +726,10 @@ export default function MessengerApp() {
         isBlocked={blockedUsers.includes(selectedPerson.uid)}
         amIBlocked={selectedPerson.blockedUsers?.includes(user?.uid as string)}
         isFriend={myFriends.includes(selectedPerson.uid)}
+        isRequestSent={outgoingRequests.includes(selectedPerson.uid)}
+        isRequestReceived={incomingRequests.includes(selectedPerson.uid)}
+        onCancelRequest={() => handleCancelFriendRequest(selectedPerson.uid)}
+        onAcceptRequest={() => handleAcceptFriendRequest(selectedPerson.uid)}
         onBack={() => {
           if (isMobile && window.history.state?.chatOpen) {
             window.history.back();
@@ -1784,8 +1788,16 @@ export default function MessengerApp() {
                   isBlocked={blockedUsers.includes(selectedPerson.uid)}
                   amIBlocked={selectedPerson.blockedUsers?.includes(user?.uid as string)}
                   isFriend={myFriends.includes(selectedPerson.uid)}
+                  isRequestSent={outgoingRequests.includes(selectedPerson.uid)}
+                  isRequestReceived={incomingRequests.includes(selectedPerson.uid)}
+                  onCancelRequest={() => handleCancelFriendRequest(selectedPerson.uid)}
+                  onAcceptRequest={() => handleAcceptFriendRequest(selectedPerson.uid)}
                   onBack={() => setSelectedOtherUid(null)}
                   onAddFriend={() => handleSendFriendRequest(selectedPerson.uid)}
+                  onUnfriend={() => {
+                    setSelectedOtherUid(null);
+                    setActiveTab('discover');
+                  }}
                   onCall={(type) => callManager.startCall(
                     { id: selectedPerson.uid, name: selectedPerson.name, avatar: selectedPerson.photoURL },
                     type

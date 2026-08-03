@@ -94,12 +94,16 @@ interface ChatViewProps {
   isBlocked?: boolean;
   amIBlocked?: boolean;
   isFriend?: boolean;
+  isRequestSent?: boolean;
+  isRequestReceived?: boolean;
   onBack?: () => void;
   onCall?: (type: 'voice' | 'video') => void;
   onLeaveGroup?: () => void;
   onDeleteGroup?: () => void;
   onUnfriend?: () => void;
   onAddFriend?: () => void;
+  onCancelRequest?: () => void;
+  onAcceptRequest?: () => void;
   embedded?: boolean;
 }
 
@@ -110,7 +114,23 @@ const PICKER_EMOJIS = ["😀","😁","😂","🤣","😊","😍","😘","😎","
 // probably closed the tab without clearing it).
 const TYPING_TTL_MS = 6000;
 
-export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, onUnfriend, onAddFriend, isBlocked, amIBlocked, isFriend, embedded = false }: ChatViewProps) {
+export function ChatView({ 
+  chat, 
+  isBlocked, 
+  amIBlocked, 
+  isFriend, 
+  isRequestSent,
+  isRequestReceived,
+  onBack, 
+  onCall, 
+  onLeaveGroup, 
+  onDeleteGroup, 
+  onUnfriend, 
+  onAddFriend,
+  onCancelRequest,
+  onAcceptRequest,
+  embedded = false 
+}: ChatViewProps) {
   const displayName = chat.nickname || chat.name;
   const { user } = useAuth();
   const { settings } = useSettings();
@@ -811,7 +831,7 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, on
                 </Popover>
                 {!chat.isGroup && (
                   <button
-                    onClick={() => { setInfoOpen(false); setNewNickname(chat.nickname || chat.name); setEditNicknameOpen(true); }}
+                    onClick={() => { setInfoOpen(false); setTimeout(() => { setNewNickname(chat.nickname || chat.name); setEditNicknameOpen(true); }, 100); }}
                     className="w-full flex items-center gap-3 p-3.5 rounded-2xl border border-border/50 hover:bg-muted/50 text-left transition-colors group"
                   >
                     <div className="bg-muted p-2 rounded-xl group-hover:bg-primary/10 transition-colors"><Edit3 className="h-4 w-4 text-primary" /></div>
@@ -854,6 +874,26 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, on
                           <UserMinus className="h-4 w-4 text-destructive" />
                         </div>
                         <span className="text-sm font-semibold text-destructive">Unfriend</span>
+                      </button>
+                    ) : isRequestSent ? (
+                      <button
+                        onClick={() => { setInfoOpen(false); onCancelRequest?.(); }}
+                        className="w-full flex items-center gap-3 p-3.5 rounded-2xl hover:bg-destructive/10 text-left transition-colors group"
+                      >
+                        <div className="bg-destructive/10 group-hover:bg-destructive/20 p-2 rounded-xl transition-colors">
+                          <X className="h-4 w-4 text-destructive" />
+                        </div>
+                        <span className="text-sm font-semibold text-destructive">Cancel Request</span>
+                      </button>
+                    ) : isRequestReceived ? (
+                      <button
+                        onClick={() => { setInfoOpen(false); onAcceptRequest?.(); }}
+                        className="w-full flex items-center gap-3 p-3.5 rounded-2xl hover:bg-primary/10 text-left transition-colors group"
+                      >
+                        <div className="bg-primary/10 group-hover:bg-primary/20 p-2 rounded-xl transition-colors">
+                          <Plus className="h-4 w-4 text-primary" />
+                        </div>
+                        <span className="text-sm font-semibold text-primary">Accept Request</span>
                       </button>
                     ) : (
                       <button
@@ -1103,7 +1143,19 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, on
                       </div>
                     </button>
                   ) : msg.type === "audio" && msg.mediaURL ? (
-                    <audio src={msg.mediaURL} controls className="w-full max-w-[280px] h-11" style={{ minWidth: '240px' }} />
+                    <audio 
+                      src={msg.mediaURL} 
+                      controls 
+                      className="w-full max-w-[280px] h-11 pointer-events-auto" 
+                      style={{ minWidth: '240px' }} 
+                      onContextMenu={(e) => {
+                        if (window.innerWidth < 768) {
+                          e.preventDefault();
+                          setActiveLongPressMsg(msg);
+                          if (window.navigator.vibrate) window.navigator.vibrate(50);
+                        }
+                      }}
+                    />
                   ) : msg.type === "file" && msg.mediaURL ? (
                     <a href={msg.mediaURL} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 underline break-all font-medium">
                       <FileIcon className="h-5 w-5 shrink-0" />
@@ -1511,6 +1563,12 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, on
               <div>
                 <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2 px-2">Quick Actions</h4>
                 <div className="bg-muted/10 border border-border/40 rounded-[24px] p-2 space-y-1">
+                  {!chat.isGroup && (
+                    <Button variant="ghost" size="sm" onClick={() => { setContactInfoOpen(false); setTimeout(() => { setNewNickname(chat.nickname || chat.name); setEditNicknameOpen(true); }, 100); }} className="justify-start gap-3 rounded-xl px-4 py-6 font-semibold w-full">
+                      <div className="bg-muted p-2 rounded-lg text-primary"><Edit3 className="h-5 w-5" /></div>
+                      Change Nickname
+                    </Button>
+                  )}
                   <button onClick={() => setContactInfoOpen(false)} className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-muted/20 transition-colors">
                     <div className="flex items-center gap-3 text-primary">
                       <MessageSquare className="h-5 w-5" />
@@ -1521,21 +1579,25 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, on
                   {!chat.isGroup && (
                     <>
                       {isFriend ? (
-                        <button onClick={() => { setContactInfoOpen(false); setConfirmUnfriend(true); }} className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-destructive/10 transition-colors">
-                          <div className="flex items-center gap-3 text-destructive">
-                            <UserMinus className="h-5 w-5" />
-                            <span className="text-sm font-medium text-destructive">Unfriend</span>
-                          </div>
-                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                        </button>
+                        <Button variant="ghost" size="sm" onClick={() => { setContactInfoOpen(false); setTimeout(() => setConfirmUnfriend(true), 100); }} className="justify-start gap-3 rounded-xl px-4 py-6 font-semibold text-destructive hover:bg-destructive/10 hover:text-destructive w-full">
+                          <div className="bg-destructive/10 p-2 rounded-lg"><UserMinus className="h-5 w-5" /></div>
+                          Unfriend
+                        </Button>
+                      ) : isRequestSent ? (
+                        <Button variant="ghost" size="sm" onClick={() => { setContactInfoOpen(false); setTimeout(() => onCancelRequest?.(), 100); }} className="justify-start gap-3 rounded-xl px-4 py-6 font-semibold text-destructive hover:bg-destructive/10 hover:text-destructive w-full">
+                          <div className="bg-destructive/10 p-2 rounded-lg"><X className="h-5 w-5" /></div>
+                          Cancel Request
+                        </Button>
+                      ) : isRequestReceived ? (
+                        <Button variant="ghost" size="sm" onClick={() => { setContactInfoOpen(false); setTimeout(() => onAcceptRequest?.(), 100); }} className="justify-start gap-3 rounded-xl px-4 py-6 font-semibold text-primary hover:bg-primary/10 w-full">
+                          <div className="bg-primary/10 p-2 rounded-lg"><Plus className="h-5 w-5" /></div>
+                          Accept Request
+                        </Button>
                       ) : (
-                        <button onClick={() => { setContactInfoOpen(false); onAddFriend?.(); }} className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-primary/10 transition-colors">
-                          <div className="flex items-center gap-3 text-primary">
-                            <Plus className="h-5 w-5" />
-                            <span className="text-sm font-medium text-primary">Add Friend</span>
-                          </div>
-                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                        </button>
+                        <Button variant="ghost" size="sm" onClick={() => { setContactInfoOpen(false); setTimeout(() => onAddFriend?.(), 100); }} className="justify-start gap-3 rounded-xl px-4 py-6 font-semibold text-primary hover:bg-primary/10 w-full">
+                          <div className="bg-primary/10 p-2 rounded-lg"><Plus className="h-5 w-5" /></div>
+                          Add Friend
+                        </Button>
                       )}
                     </>
                   )}
@@ -1779,29 +1841,30 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, on
                )}
             </div>
           )}
-          {/* Edit Nickname Dialog */}
-          <Dialog open={editNicknameOpen} onOpenChange={setEditNicknameOpen}>
-            <DialogContent className="sm:max-w-xs rounded-2xl p-5">
-              <DialogHeader>
-                <DialogTitle>Edit Nickname</DialogTitle>
-              </DialogHeader>
-              <div className="py-2">
-                <Input
-                  value={newNickname}
-                  onChange={(e) => setNewNickname(e.target.value)}
-                  placeholder="Nickname"
-                  className="rounded-xl border-border bg-muted/50"
-                  autoFocus
-                />
-              </div>
-              <div className="flex justify-end gap-2 mt-2">
-                <Button variant="ghost" onClick={() => setEditNicknameOpen(false)}>Cancel</Button>
-                <Button onClick={handleSaveNickname}>Save</Button>
-              </div>
-            </DialogContent>
-          </Dialog>
         </SheetContent>
       </Sheet>
+
+      {/* Edit Nickname Dialog */}
+      <Dialog open={editNicknameOpen} onOpenChange={setEditNicknameOpen}>
+        <DialogContent className="sm:max-w-xs rounded-2xl p-5">
+          <DialogHeader>
+            <DialogTitle>Edit Nickname</DialogTitle>
+          </DialogHeader>
+          <div className="py-2">
+            <Input
+              value={newNickname}
+              onChange={(e) => setNewNickname(e.target.value)}
+              placeholder="Nickname"
+              className="rounded-xl border-border bg-muted/50"
+              autoFocus
+            />
+          </div>
+          <div className="flex justify-end gap-2 mt-2">
+            <Button variant="ghost" onClick={() => setEditNicknameOpen(false)}>Cancel</Button>
+            <Button onClick={handleSaveNickname}>Save</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
