@@ -77,14 +77,32 @@ export class CallSession {
   }
 
   private async getMedia(type: CallType) {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
-      },
-      video: type === "video",
-    });
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+        video: type === "video" ? { facingMode: "user" } : false,
+      });
+    } catch (e: any) {
+      // Fallback to audio only if video fails (e.g. no camera)
+      if (type === "video") {
+        console.warn("Video failed, falling back to audio only.", e);
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
+          video: false,
+        });
+      } else {
+        throw e;
+      }
+    }
     this.localStream = stream;
     stream.getTracks().forEach((track) => this.pc.addTrack(track, stream));
     return stream;

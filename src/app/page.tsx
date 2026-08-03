@@ -286,7 +286,7 @@ export default function MessengerApp() {
 
         const otherUid = chat.participants.find((p) => p !== user.uid);
         const other = otherUid ? directoryMap[otherUid] : undefined;
-        if (!otherUid || !other || !myFriends.includes(otherUid)) return null;
+        if (!otherUid || !other) return null;
         return {
           chatId: chat.id,
           otherUid,
@@ -299,6 +299,7 @@ export default function MessengerApp() {
           time: timeAgo(chat.lastMessageAt),
           unread: chat.unread?.[user.uid] || 0,
           quickEmoji: chat.quickEmoji,
+          nickname: chat.nicknames?.[otherUid] || undefined,
         };
       })
       .filter(Boolean) as Array<{
@@ -2085,10 +2086,55 @@ export default function MessengerApp() {
                 <AvatarFallback className="text-xl">{selectedUserDetails?.name[0]}</AvatarFallback>
               </Avatar>
               
-              <div className="space-y-1 mb-6">
-                <h2 className="text-2xl font-bold font-headline">{selectedUserDetails?.name}</h2>
-                {selectedUserDetails?.status && (
-                  <p className="text-sm text-muted-foreground">{selectedUserDetails.status}</p>
+              <div className="flex items-start justify-between gap-4 mb-6">
+                <div className="space-y-1">
+                  <h2 className="text-2xl font-bold font-headline">{selectedUserDetails?.name}</h2>
+                  {selectedUserDetails?.status && (
+                    <p className="text-sm text-muted-foreground">{selectedUserDetails.status}</p>
+                  )}
+                </div>
+                
+                {user && selectedUserDetails && user.uid !== selectedUserDetails.uid && (
+                  <div className="shrink-0 mt-1">
+                    {myFriends.includes(selectedUserDetails.uid) ? (
+                      <Button variant="outline" size="sm" className="rounded-full" onClick={() => openConversation(selectedUserDetails.uid)}>
+                        <MessageSquare className="h-4 w-4 mr-2" /> Message
+                      </Button>
+                    ) : outgoingRequests.includes(selectedUserDetails.uid) ? (
+                      <Button variant="secondary" size="sm" className="rounded-full bg-muted-foreground/20 text-muted-foreground hover:bg-muted-foreground/30" onClick={async () => {
+                        try {
+                          await cancelFriendRequest(user.uid, selectedUserDetails.uid);
+                          toast({ title: "Request Cancelled" });
+                        } catch (e) {
+                          toast({ title: "Failed to cancel request" });
+                        }
+                      }}>
+                        Cancel Request
+                      </Button>
+                    ) : incomingRequests.includes(selectedUserDetails.uid) ? (
+                      <Button variant="default" size="sm" className="rounded-full" onClick={async () => {
+                        try {
+                          await acceptFriendRequest(user.uid, selectedUserDetails.uid);
+                          toast({ title: "Request Accepted" });
+                        } catch (e) {
+                          toast({ title: "Failed to accept request" });
+                        }
+                      }}>
+                        Accept Request
+                      </Button>
+                    ) : (
+                      <Button variant="default" size="sm" className="rounded-full bg-[#0084ff] hover:bg-[#0084ff]/90 text-white" onClick={async () => {
+                        try {
+                          await sendFriendRequest(user.uid, selectedUserDetails.uid);
+                          toast({ title: "Request Sent" });
+                        } catch (e) {
+                          toast({ title: "Failed to send request" });
+                        }
+                      }}>
+                        <Plus className="h-4 w-4 mr-2" /> Add Friend
+                      </Button>
+                    )}
+                  </div>
                 )}
               </div>
 

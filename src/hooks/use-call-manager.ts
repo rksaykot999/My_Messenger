@@ -10,6 +10,7 @@ import {
   type CallType,
 } from "@/lib/webrtc";
 import { useAuth } from "@/contexts/AuthContext";
+import { ensureChat, sendMessage } from "@/lib/chat";
 
 export interface ActiveCallState {
   callId: string;
@@ -20,6 +21,9 @@ export interface ActiveCallState {
   status: "ringing" | "connecting" | "connected";
   localStream: MediaStream | null;
   remoteStream: MediaStream | null;
+  isCaller: boolean;
+  otherUid: string;
+  startTime?: number;
 }
 
 export function useCallManager() {
@@ -48,7 +52,7 @@ export function useCallManager() {
     const unsub = subscribeCallDoc(activeCall.callId, (call) => {
       if (!call) return;
       if (call.status === "accepted") {
-        setActiveCall((prev) => (prev ? { ...prev, status: "connected" } : prev));
+        setActiveCall((prev) => (prev ? { ...prev, status: "connected", startTime: prev.startTime || Date.now() } : prev));
       }
       if (call.status === "ended" || call.status === "declined") {
         endLocalSession();
@@ -60,13 +64,30 @@ export function useCallManager() {
 
   const endLocalSession = useCallback(async (finalStatus: "ended" | "declined" = "ended") => {
     const session = sessionRef.current;
+    const currentActiveCall = activeCall; // Capture before nulling
     sessionRef.current = null;
     setActiveCall(null);
     setIncomingCall(null);
     if (session) {
       await session.cleanup(finalStatus);
     }
-  }, []);
+    
+    // Log the call message if we were the caller, to avoid duplicate messages.
+    if (user && currentActiveCall && currentActiveCall.isCaller) {
+       try {
+         const chatId = await ensureChat(user.uid, currentActiveCall.otherUid);
+         const isVideo = currentActiveCall.type === "video";
+         if (currentActiveCall.status === "connected" && currentActiveCall.startTime) {
+           const duration = Math.floor((Date.now() - currentActiveCall.startTime) / 1000);
+           await sendMessage(chatId, user.uid, isVideo ? "Video call" : "Audio call", { type: "call", callDuration: duration });
+         } else {
+           await sendMessage(chatId, user.uid, isVideo ? "Missed video call" : "Missed audio call", { type: "call" });
+         }
+       } catch (e) {
+         console.error("Failed to log call message", e);
+       }
+    }
+  }, [activeCall, user]);
 
   const startCall = useCallback(
     async (callee: { id: string; name: string; avatar: string }, type: CallType) => {
@@ -82,6 +103,8 @@ export function useCallManager() {
         status: "connecting",
         localStream: null,
         remoteStream: session.remoteStream,
+        isCaller: true,
+        otherUid: callee.id,
       });
       try {
         const callId = await session.startCall({
@@ -119,11 +142,13 @@ export function useCallManager() {
       status: "connecting",
       localStream: null,
       remoteStream: session.remoteStream,
+      isCaller: false,
+      otherUid: call.callerId,
     });
     try {
       await session.answerCall(call.id, call.type);
       setActiveCall((prev) =>
-        prev ? { ...prev, status: "connected", localStream: session.localStream } : prev
+        prev ? { ...prev, status: "connected", localStream: session.localStream, startTime: Date.now() } : prev
       );
     } catch (e: any) {
       console.error("Failed to answer call", e);

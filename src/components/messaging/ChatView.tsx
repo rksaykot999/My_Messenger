@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { ArrowLeft, Phone, Video, Plus, Send, Image as ImageIcon, Camera as CameraIcon, Film, Info, Trash2, ShieldOff, ShieldCheck, UserRound, Loader2, Mail, Smile, Reply, X, Search, ChevronUp, ChevronDown, MessageSquare, ChevronRight, UserMinus, Download, LogOut, Mic, Pencil, Paperclip as FileIcon } from "lucide-react";
+import { ArrowLeft, Phone, PhoneOff, Video, Plus, Send, Image as ImageIcon, Camera as CameraIcon, Film, Info, Trash2, ShieldOff, ShieldCheck, UserRound, Loader2, Mail, Smile, Reply, X, Search, ChevronUp, ChevronDown, MessageSquare, ChevronRight, UserMinus, Download, LogOut, Mic, Pencil, Paperclip as FileIcon, Edit3 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -52,6 +52,7 @@ import {
   deleteMessageForEveryone,
   deleteMessageForMe,
   setQuickEmoji,
+  setNickname,
   formatLastSeen,
   editMessage,
   type ChatMessage,
@@ -85,6 +86,7 @@ interface ChatViewProps {
     participants?: { uid: string; name: string; avatar: string }[];
     adminId?: string;
     quickEmoji?: string;
+    nickname?: string;
   };
   isBlocked?: boolean;
   amIBlocked?: boolean;
@@ -105,6 +107,7 @@ const PICKER_EMOJIS = ["😀","😁","😂","🤣","😊","😍","😘","😎","
 const TYPING_TTL_MS = 6000;
 
 export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, onUnfriend, isBlocked, amIBlocked, isFriend, embedded = false }: ChatViewProps) {
+  const displayName = chat.nickname || chat.name;
   const { user } = useAuth();
   const { settings } = useSettings();
   const { toast } = useToast();
@@ -118,6 +121,8 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, on
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [confirmDeleteGroup, setConfirmDeleteGroup] = useState(false);
   const [confirmUnfriend, setConfirmUnfriend] = useState(false);
+  const [editNicknameOpen, setEditNicknameOpen] = useState(false);
+  const [newNickname, setNewNickname] = useState("");
   
   // Combine blocked states for inputs
   const inputDisabled = isBlocked || amIBlocked || (!chat.isGroup && !isFriend);
@@ -689,8 +694,19 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, on
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchIndex, searchQuery]);
 
+  const handleSaveNickname = async () => {
+    if (!chatId || !user) return;
+    try {
+      await setNickname(chatId, chat.id, newNickname);
+      setEditNicknameOpen(false);
+      toast({ title: "Nickname updated" });
+    } catch (e) {
+      toast({ title: "Failed to update nickname" });
+    }
+  };
+
   return (
-    <div className={cn("relative flex h-full min-h-0 flex-col bg-transparent", embedded && "w-full flex-1")}>
+    <div className={cn("flex h-full flex-col bg-background/95 backdrop-blur-3xl overflow-hidden", embedded ? "" : "border-l border-border/70 relative")}>
       <header className={cn("app-toolbar sticky top-0 z-10 flex items-center justify-between px-4 py-3", embedded && "lg:rounded-t-[34px]")}>
         <div className="flex items-center gap-3 min-w-0">
           {!embedded && (
@@ -702,7 +718,7 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, on
             <div className="relative shrink-0">
               <Avatar className="h-10 w-10 ring-2 ring-background/80 shadow-md">
                 <AvatarImage src={chat.avatar} />
-                <AvatarFallback>{chat.name.substring(0, 2)}</AvatarFallback>
+                <AvatarFallback>{displayName.substring(0, 2)}</AvatarFallback>
               </Avatar>
               {chat.online && <div className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-background bg-emerald-500" />}
             </div>
@@ -746,7 +762,7 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, on
                   <AvatarImage src={chat.avatar} />
                   <AvatarFallback className="text-xl">{chat.name.substring(0, 2)}</AvatarFallback>
                 </Avatar>
-                <h4 className="text-lg font-bold font-headline">{chat.name}</h4>
+                <h3 className="text-lg font-bold font-headline">{displayName}</h3>
               </div>
               <div className="space-y-1.5">
                 <button
@@ -888,7 +904,7 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, on
             <div className="mb-3 flex h-16 w-16 items-center justify-center rounded-[24px] bg-primary/10 text-2xl text-primary">
               👋
             </div>
-            <p className="text-sm font-medium text-foreground">Say hi to {chat.name.split(' ')[0]}</p>
+            <p className="text-sm font-medium text-foreground">Say hi to {displayName.split(' ')[0]}</p>
             <p className="mt-1 text-xs text-muted-foreground">This is the beginning of your conversation.</p>
           </div>
         )}
@@ -996,7 +1012,7 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, on
                     )}
                   >
                     <span className="font-semibold text-accent">
-                      {msg.replyTo.senderId === user?.uid ? "You" : chat.name.split(" ")[0]}
+                      {msg.replyTo.senderId === user?.uid ? "You" : displayName.split(" ")[0]}
                     </span>
                     <span className="ml-1.5 opacity-80">{msg.replyTo.text || "Attachment"}</span>
                   </button>
@@ -1047,6 +1063,19 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, on
                       <FileIcon className="h-5 w-5 shrink-0" />
                       {msg.text || "Download File"}
                     </a>
+                  ) : msg.type === "call" ? (
+                    <div className="flex flex-col gap-2 min-w-[160px]">
+                      <div className="flex items-center gap-3">
+                        <div className={cn("rounded-full p-2.5", msg.text.toLowerCase().includes("missed") ? "bg-red-500 text-white" : "bg-muted-foreground/20")}>
+                           {msg.text.toLowerCase().includes("video") ? <Video className="h-5 w-5" /> : (msg.text.toLowerCase().includes("missed") ? <PhoneOff className="h-5 w-5" /> : <Phone className="h-5 w-5" />)}
+                        </div>
+                        <div>
+                          <span className="font-semibold text-foreground/90">{displayName}</span>
+                          <p className="text-xs opacity-80">{msg.callDuration ? `${Math.floor(msg.callDuration / 60)} mins ${msg.callDuration % 60} secs` : (msg.createdAt as any)?.toDate?.().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) || ""}</p>
+                        </div>
+                      </div>
+                      <Button variant="secondary" size="sm" className="w-full mt-2 font-semibold bg-background/20 hover:bg-background/40 border-none" onClick={() => onCall?.(msg.text.toLowerCase().includes("video") ? "video" : "voice")}>Call back</Button>
+                    </div>
                   ) : (
                     msg.text
                   )}
@@ -1368,11 +1397,11 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, on
               <div className="relative">
                 <Avatar className="h-28 w-28 mb-3 ring-4 ring-background shadow-xl">
                   <AvatarImage src={chat.avatar} />
-                  <AvatarFallback className="text-3xl">{chat.name.substring(0, 2)}</AvatarFallback>
+                  <AvatarFallback className="text-3xl">{displayName.substring(0, 2)}</AvatarFallback>
                 </Avatar>
                 {chat.online && <div className="absolute bottom-2 right-1 h-5 w-5 rounded-full border-4 border-background bg-emerald-500" />}
               </div>
-              <h4 className="text-2xl font-bold font-headline">{chat.name}</h4>
+              <h4 className="text-2xl font-bold font-headline">{displayName}</h4>
               {!chat.isGroup && (
                 <p className="text-sm text-emerald-500 font-medium mt-1">
                   {blocked ? 'Blocked' : chat.online ? 'Active Now' : 'Offline'}
@@ -1436,6 +1465,15 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, on
                       />
                     </PopoverContent>
                   </Popover>
+                  {!chat.isGroup && (
+                    <button onClick={() => { setContactInfoOpen(false); setNewNickname(chat.nickname || chat.name); setEditNicknameOpen(true); }} className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-muted/20 transition-colors">
+                      <div className="flex items-center gap-3 text-primary">
+                        <Edit3 className="h-5 w-5" />
+                        <span className="text-sm font-medium">Change Nickname</span>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                  )}
                   {!chat.isGroup ? (
                     <button onClick={() => { setContactInfoOpen(false); setConfirmDelete(true); }} className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-destructive/10 transition-colors">
                       <div className="flex items-center gap-3 text-destructive">
@@ -1677,6 +1715,27 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, on
                </Button>
             </div>
           )}
+          {/* Edit Nickname Dialog */}
+          <Dialog open={editNicknameOpen} onOpenChange={setEditNicknameOpen}>
+            <DialogContent className="sm:max-w-xs rounded-2xl p-5">
+              <DialogHeader>
+                <DialogTitle>Edit Nickname</DialogTitle>
+              </DialogHeader>
+              <div className="py-2">
+                <Input
+                  value={newNickname}
+                  onChange={(e) => setNewNickname(e.target.value)}
+                  placeholder="Nickname"
+                  className="rounded-xl border-border bg-muted/50"
+                  autoFocus
+                />
+              </div>
+              <div className="flex justify-end gap-2 mt-2">
+                <Button variant="ghost" onClick={() => setEditNicknameOpen(false)}>Cancel</Button>
+                <Button onClick={handleSaveNickname}>Save</Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </SheetContent>
       </Sheet>
     </div>

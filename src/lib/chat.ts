@@ -28,8 +28,9 @@ export interface ChatMessage {
   senderId: string;
   createdAt: Timestamp | null;
   status: "sent" | "delivered" | "read";
-  type?: "text" | "image" | "video" | "audio" | "file";
+  type?: "text" | "image" | "video" | "audio" | "file" | "call";
   mediaURL?: string;
+  callDuration?: number;
   reactions?: Record<string, string>;
   replyTo?: { id: string; text: string; senderId: string } | null;
   deleted?: boolean;
@@ -51,6 +52,7 @@ export interface ChatSummary {
   groupAvatar?: string;
   adminId?: string;
   quickEmoji?: string;
+  nicknames?: Record<string, string>;
 }
 
 export interface DirectoryUser {
@@ -151,7 +153,7 @@ export async function sendMessage(
   chatId: string,
   senderId: string,
   text: string,
-  media?: { type: "image" | "video" | "audio" | "file"; mediaURL: string },
+  media?: { type: "image" | "video" | "audio" | "file" | "call"; mediaURL?: string; callDuration?: number },
   replyTo?: { id: string; text: string; senderId: string } | null
 ) {
   const chatRef = doc(db, "chats", chatId);
@@ -160,13 +162,13 @@ export async function sendMessage(
     senderId,
     createdAt: serverTimestamp(),
     status: "sent",
-    ...(media ? { type: media.type, mediaURL: media.mediaURL } : { type: "text" }),
+    ...(media ? { type: media.type, mediaURL: media.mediaURL || "", ...(media.callDuration !== undefined ? { callDuration: media.callDuration } : {}) } : { type: "text" }),
     ...(replyTo ? { replyTo } : {}),
   });
   const snap = await getDoc(chatRef);
   const data = snap.data() as any;
   const otherUid = (data?.participants || []).find((p: string) => p !== senderId);
-  const previewText = media ? (media.type === "image" ? "📷 Photo" : media.type === "video" ? "🎥 Video" : media.type === "file" ? "📁 File" : "🎤 Voice") : text;
+  const previewText = media ? (media.type === "image" ? "📷 Photo" : media.type === "video" ? "🎥 Video" : media.type === "file" ? "📁 File" : media.type === "call" ? text : "🎤 Voice") : text;
   const updates: Record<string, any> = {
     lastMessage: previewText,
     lastMessageAt: serverTimestamp(),
@@ -290,7 +292,6 @@ export async function markMessagesRead(chatId: string, myUid: string) {
   }
 }
 
-/** Marks every message from the other participant as at least "delivered". */
 export async function markMessagesDelivered(chatId: string, myUid: string) {
   try {
     const q = query(
@@ -311,6 +312,13 @@ export async function markMessagesDelivered(chatId: string, myUid: string) {
   } catch {
     // Best-effort.
   }
+}
+
+export async function setNickname(chatId: string, targetUid: string, nickname: string) {
+  const chatRef = doc(db, "chats", chatId);
+  await updateDoc(chatRef, {
+    [`nicknames.${targetUid}`]: nickname,
+  });
 }
 
 /** Broadcasts (or clears) that I'm typing in this chat. */
