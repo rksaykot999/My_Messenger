@@ -286,7 +286,7 @@ export default function MessengerApp() {
 
         const otherUid = chat.participants.find((p) => p !== user.uid);
         const other = otherUid ? directoryMap[otherUid] : undefined;
-        if (!otherUid || !other) return null;
+        if (!otherUid || !other || !myFriends.includes(otherUid)) return null;
         return {
           chatId: chat.id,
           otherUid,
@@ -306,7 +306,7 @@ export default function MessengerApp() {
         online: boolean; lastMessage: string; lastSenderId?: string; time: string; unread: number;
         participants?: string[]; quickEmoji?: string;
       }>;
-  }, [chats, directoryMap, user]);
+  }, [chats, directoryMap, myFriends, user]);
 
   const totalUnread = chatRows.reduce((acc, c) => acc + c.unread, 0);
 
@@ -726,6 +726,14 @@ export default function MessengerApp() {
           } else {
             setSelectedOtherUid(null);
           }
+        }}
+        onUnfriend={() => {
+          if (isMobile && window.history.state?.chatOpen) {
+            window.history.back();
+          } else {
+            setSelectedOtherUid(null);
+          }
+          setActiveTab('discover');
         }}
         onCall={(type) => callManager.startCall(
           { id: selectedPerson.uid, name: selectedPerson.name, avatar: selectedPerson.photoURL },

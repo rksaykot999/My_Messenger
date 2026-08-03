@@ -28,7 +28,7 @@ export interface ChatMessage {
   senderId: string;
   createdAt: Timestamp | null;
   status: "sent" | "delivered" | "read";
-  type?: "text" | "image" | "video" | "audio";
+  type?: "text" | "image" | "video" | "audio" | "file";
   mediaURL?: string;
   reactions?: Record<string, string>;
   replyTo?: { id: string; text: string; senderId: string } | null;
@@ -151,7 +151,7 @@ export async function sendMessage(
   chatId: string,
   senderId: string,
   text: string,
-  media?: { type: "image" | "video" | "audio"; mediaURL: string },
+  media?: { type: "image" | "video" | "audio" | "file"; mediaURL: string },
   replyTo?: { id: string; text: string; senderId: string } | null
 ) {
   const chatRef = doc(db, "chats", chatId);
@@ -166,7 +166,7 @@ export async function sendMessage(
   const snap = await getDoc(chatRef);
   const data = snap.data() as any;
   const otherUid = (data?.participants || []).find((p: string) => p !== senderId);
-  const previewText = media ? (media.type === "image" ? "📷 Photo" : media.type === "video" ? "🎥 Video" : "🎤 Voice") : text;
+  const previewText = media ? (media.type === "image" ? "📷 Photo" : media.type === "video" ? "🎥 Video" : media.type === "file" ? "📁 File" : "🎤 Voice") : text;
   const updates: Record<string, any> = {
     lastMessage: previewText,
     lastMessageAt: serverTimestamp(),

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { ArrowLeft, Phone, Video, Plus, Send, Image as ImageIcon, Camera as CameraIcon, Film, Info, Trash2, ShieldOff, ShieldCheck, UserRound, Loader2, Mail, Smile, Reply, X, Search, ChevronUp, ChevronDown, MessageSquare, ChevronRight, UserMinus, Download, LogOut, Mic, Pencil } from "lucide-react";
+import { ArrowLeft, Phone, Video, Plus, Send, Image as ImageIcon, Camera as CameraIcon, Film, Info, Trash2, ShieldOff, ShieldCheck, UserRound, Loader2, Mail, Smile, Reply, X, Search, ChevronUp, ChevronDown, MessageSquare, ChevronRight, UserMinus, Download, LogOut, Mic, Pencil, Paperclip as FileIcon } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -93,6 +93,7 @@ interface ChatViewProps {
   onCall?: (type: 'voice' | 'video') => void;
   onLeaveGroup?: () => void;
   onDeleteGroup?: () => void;
+  onUnfriend?: () => void;
   embedded?: boolean;
 }
 
@@ -103,7 +104,7 @@ const PICKER_EMOJIS = ["😀","😁","😂","🤣","😊","😍","😘","😎","
 // probably closed the tab without clearing it).
 const TYPING_TTL_MS = 6000;
 
-export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, isBlocked, amIBlocked, isFriend, embedded = false }: ChatViewProps) {
+export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, onUnfriend, isBlocked, amIBlocked, isFriend, embedded = false }: ChatViewProps) {
   const { user } = useAuth();
   const { settings } = useSettings();
   const { toast } = useToast();
@@ -119,7 +120,7 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
   const [confirmUnfriend, setConfirmUnfriend] = useState(false);
   
   // Combine blocked states for inputs
-  const inputDisabled = isBlocked || amIBlocked;
+  const inputDisabled = isBlocked || amIBlocked || (!chat.isGroup && !isFriend);
   const [blocked, setBlocked] = useState(!!isBlocked);
   const [otherTyping, setOtherTyping] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -147,6 +148,7 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
   const videoInputRef = useRef<HTMLInputElement | null>(null);
   const audioInputRef = useRef<HTMLInputElement | null>(null);
   const gifInputRef = useRef<HTMLInputElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const swipeState = useRef<{ id: string | null; startX: number; startY: number; isSwiping: boolean }>({ id: null, startX: 0, startY: 0, isSwiping: false });
 
@@ -452,7 +454,7 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
 
   const handleAttachmentSelected = async (
     file: File | undefined,
-    type: "image" | "video" | "audio"
+    type: "image" | "video" | "audio" | "file"
   ) => {
     if (!file || !user) return;
     if (blocked) {
@@ -479,7 +481,7 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
         uploadTimeout
       ]) as string;
 
-      await sendMessage(id, user.uid, type === "image" ? "📷 Photo" : type === "video" ? "🎥 Video" : "🎤 Voice", { type, mediaURL });
+      await sendMessage(id, user.uid, type === "image" ? "📷 Photo" : type === "video" ? "🎥 Video" : type === "file" ? file.name : "🎤 Voice", { type, mediaURL });
     } catch (err: any) {
       console.error("Failed to send attachment. Full error:", err);
       const errorMessage = err?.message || (typeof err === 'string' ? err : "Unknown error");
@@ -618,6 +620,7 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
     toast({ title: `Unfriended ${chat.name}`, description: "You are no longer friends." });
     setConfirmUnfriend(false);
     setInfoOpen(false);
+    onUnfriend?.();
   };
 
   const handleReact = async (msg: ChatMessage, emoji: string) => {
@@ -760,21 +763,14 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
                       <span className="text-sm font-semibold">Change Quick Emoji</span>
                     </button>
                   </PopoverTrigger>
-                  <PopoverContent side="bottom" align="center" className="w-72 rounded-2xl border-none p-3 shadow-2xl app-surface z-[110]">
-                     <div className="mb-2 text-xs font-semibold text-muted-foreground px-1">Quick Message</div>
-                     <div className="grid grid-cols-8 gap-1">
-                        {PICKER_EMOJIS.map((e) => (
-                          <PopoverClose key={e} asChild>
-                            <button
-                              type="button"
-                              onClick={() => { setInfoOpen(false); handleChangeQuickEmoji(e); }}
-                              className="rounded-lg p-1 text-xl transition-transform hover:scale-125 hover:bg-muted"
-                            >
-                              {e}
-                            </button>
-                          </PopoverClose>
-                        ))}
-                     </div>
+                  <PopoverContent side="bottom" align="center" className="w-auto p-0 border-none shadow-2xl bg-transparent z-[110]">
+                    <EmojiPicker
+                      onEmojiClick={(emojiData) => {
+                        handleChangeQuickEmoji(emojiData.emoji);
+                        setInfoOpen(false);
+                      }}
+                      theme={settings.theme === 'dark' ? Theme.DARK : Theme.LIGHT}
+                    />
                   </PopoverContent>
                 </Popover>
                 {!chat.isGroup ? (
@@ -1046,6 +1042,11 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
                     </button>
                   ) : msg.type === "audio" && msg.mediaURL ? (
                     <audio src={msg.mediaURL} controls className="w-full max-w-[280px] h-11" style={{ minWidth: '240px' }} />
+                  ) : msg.type === "file" && msg.mediaURL ? (
+                    <a href={msg.mediaURL} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 underline break-all font-medium">
+                      <FileIcon className="h-5 w-5 shrink-0" />
+                      {msg.text || "Download File"}
+                    </a>
                   ) : (
                     msg.text
                   )}
@@ -1209,21 +1210,27 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
             <PopoverContent side="top" align="start" className="w-56 rounded-2xl border-none p-2 shadow-2xl app-surface">
               <div className="grid grid-cols-1 gap-1">
                 <PopoverClose asChild>
-                  <Button variant="ghost" className="justify-start gap-3 h-10" onClick={() => handlePickMedia('gallery', 'image')}>
-                    <ImageIcon className="h-4 w-4 text-blue-500" />
-                    <span className="text-sm">Gallery</span>
-                  </Button>
-                </PopoverClose>
-                <PopoverClose asChild>
                   <Button variant="ghost" className="justify-start gap-3 h-10" onClick={() => handlePickMedia('camera', 'image')}>
                     <CameraIcon className="h-4 w-4 text-orange-500" />
                     <span className="text-sm">Camera</span>
                   </Button>
                 </PopoverClose>
                 <PopoverClose asChild>
+                  <Button variant="ghost" className="justify-start gap-3 h-10" onClick={() => handlePickMedia('gallery', 'image')}>
+                    <ImageIcon className="h-4 w-4 text-blue-500" />
+                    <span className="text-sm">Gallery</span>
+                  </Button>
+                </PopoverClose>
+                <PopoverClose asChild>
                   <Button variant="ghost" className="justify-start gap-3 h-10" onClick={() => handlePickMedia('gallery', 'video')}>
                     <Film className="h-4 w-4 text-purple-500" />
                     <span className="text-sm">Video</span>
+                  </Button>
+                </PopoverClose>
+                <PopoverClose asChild>
+                  <Button variant="ghost" className="justify-start gap-3 h-10" onClick={() => fileInputRef.current?.click()}>
+                    <FileIcon className="h-4 w-4 text-emerald-500" />
+                    <span className="text-sm">File</span>
                   </Button>
                 </PopoverClose>
               </div>
@@ -1255,6 +1262,7 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
           />
           <input ref={audioInputRef} type="file" accept="audio/*" className="hidden" onChange={(e) => { handleAttachmentSelected(e.target.files?.[0], "audio"); e.target.value = ""; }} />
           <input ref={gifInputRef} type="file" accept="image/gif" className="hidden" onChange={(e) => { handleAttachmentSelected(e.target.files?.[0], "image"); e.target.value = ""; }} />
+          <input ref={fileInputRef} type="file" className="hidden" onChange={(e) => { handleAttachmentSelected(e.target.files?.[0], "file"); e.target.value = ""; }} />
 
           <button type="button" disabled={inputDisabled || isUploading || isRecording} onClick={() => startRecording()} className="p-2 shrink-0 text-[#0084ff] hover:bg-white/10 rounded-full transition-colors active:scale-95 disabled:opacity-50">
              <Mic className="h-5 w-5" />
@@ -1296,7 +1304,7 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
                 // When focusing, keyboard might take a moment to appear
                 setTimeout(() => scrollToBottom(true), 300);
               }}
-              placeholder={isBlocked ? "You've blocked this user" : amIBlocked ? "You cannot reply to this conversation" : "Aa"}
+              placeholder={isBlocked ? "You've blocked this user" : amIBlocked ? "You cannot reply to this conversation" : (!chat.isGroup && !isFriend) ? "You must be friends to message" : "Aa"}
               disabled={inputDisabled}
               className="flex-1 bg-transparent border-0 focus-visible:ring-0 text-[#E4E6EB] placeholder:text-[#B0B3B8] h-10 px-3 shadow-none focus-visible:ring-offset-0 disabled:opacity-50"
             />
@@ -1310,19 +1318,13 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
                   <Smile className="h-6 w-6" />
                 </button>
               </PopoverTrigger>
-              <PopoverContent side="top" align="end" className="w-72 rounded-2xl border-none p-3 shadow-2xl app-surface">
-                <div className="grid grid-cols-8 gap-1">
-                  {PICKER_EMOJIS.map((e) => (
-                    <button
-                      key={e}
-                      type="button"
-                      onClick={() => handleInputChange(inputText + e)}
-                      className="rounded-lg p-1 text-xl transition-transform hover:scale-125 hover:bg-muted"
-                    >
-                      {e}
-                    </button>
-                  ))}
-                </div>
+              <PopoverContent side="top" align="end" className="w-auto p-0 border-none shadow-2xl bg-transparent z-[110]">
+                <EmojiPicker
+                  onEmojiClick={(emojiData) => {
+                    handleInputChange(inputText + emojiData.emoji);
+                  }}
+                  theme={settings.theme === 'dark' ? Theme.DARK : Theme.LIGHT}
+                />
               </PopoverContent>
             </Popover>
           </div>
@@ -1424,21 +1426,14 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
                         <ChevronRight className="h-4 w-4 text-muted-foreground" />
                       </button>
                     </PopoverTrigger>
-                    <PopoverContent side="bottom" align="center" className="w-72 rounded-2xl border-none p-3 shadow-2xl app-surface z-[110]">
-                       <div className="mb-2 text-xs font-semibold text-muted-foreground px-1">Quick Message</div>
-                       <div className="grid grid-cols-8 gap-1">
-                          {PICKER_EMOJIS.map((e) => (
-                            <PopoverClose key={e} asChild>
-                              <button
-                                type="button"
-                                onClick={() => { setContactInfoOpen(false); handleChangeQuickEmoji(e); }}
-                                className="rounded-lg p-1 text-xl transition-transform hover:scale-125 hover:bg-muted"
-                              >
-                                {e}
-                              </button>
-                            </PopoverClose>
-                          ))}
-                       </div>
+                    <PopoverContent side="bottom" align="center" className="w-auto p-0 border-none shadow-2xl bg-transparent z-[110]">
+                      <EmojiPicker
+                        onEmojiClick={(emojiData) => {
+                          handleChangeQuickEmoji(emojiData.emoji);
+                          setContactInfoOpen(false);
+                        }}
+                        theme={settings.theme === 'dark' ? Theme.DARK : Theme.LIGHT}
+                      />
                     </PopoverContent>
                   </Popover>
                   {!chat.isGroup ? (
@@ -1468,7 +1463,7 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, is
                   )}
                   {!chat.isGroup && (
                     <>
-                      <button onClick={() => { alert('Unfriend functionality coming soon'); }} className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-destructive/10 transition-colors">
+                      <button onClick={() => { setContactInfoOpen(false); setConfirmUnfriend(true); }} className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-destructive/10 transition-colors">
                         <div className="flex items-center gap-3 text-destructive">
                           <UserMinus className="h-5 w-5" />
                           <span className="text-sm font-medium text-destructive">Unfriend</span>
