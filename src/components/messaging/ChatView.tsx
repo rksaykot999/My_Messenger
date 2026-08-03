@@ -707,7 +707,7 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, on
   };
 
   return (
-    <div className={cn("flex h-full flex-col bg-background/95 backdrop-blur-3xl overflow-hidden", embedded ? "" : "border-l border-border/70 relative")}>
+    <div className={cn("flex h-full w-full flex-1 flex-col bg-background/95 backdrop-blur-3xl overflow-hidden", embedded ? "" : "border-l border-border/70 relative")}>
       <header className={cn("app-toolbar sticky top-0 z-10 flex items-center justify-between px-4 py-3", embedded && "lg:rounded-t-[34px]")}>
         <div className="flex items-center gap-3 min-w-0">
           {!embedded && (
@@ -1439,6 +1439,27 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, on
               <div>
                 <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2 px-2">Quick Actions</h4>
                 <div className="bg-muted/10 border border-border/40 rounded-[24px] p-2 space-y-1">
+                  {!chat.isGroup && (
+                    <>
+                      {isFriend ? (
+                        <button onClick={() => { setContactInfoOpen(false); setConfirmUnfriend(true); }} className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-destructive/10 transition-colors">
+                          <div className="flex items-center gap-3 text-destructive">
+                            <UserMinus className="h-5 w-5" />
+                            <span className="text-sm font-medium text-destructive">Unfriend</span>
+                          </div>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        </button>
+                      ) : (
+                        <button onClick={() => { setContactInfoOpen(false); onAddFriend?.(); }} className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-primary/10 transition-colors">
+                          <div className="flex items-center gap-3 text-primary">
+                            <Plus className="h-5 w-5" />
+                            <span className="text-sm font-medium text-primary">Add Friend</span>
+                          </div>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        </button>
+                      )}
+                    </>
+                  )}
                   <button onClick={() => setContactInfoOpen(false)} className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-muted/20 transition-colors">
                     <div className="flex items-center gap-3 text-primary">
                       <MessageSquare className="h-5 w-5" />
@@ -1501,32 +1522,13 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, on
                     </button>
                   )}
                   {!chat.isGroup && (
-                    <>
-                      {isFriend ? (
-                        <button onClick={() => { setContactInfoOpen(false); setConfirmUnfriend(true); }} className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-destructive/10 transition-colors">
-                          <div className="flex items-center gap-3 text-destructive">
-                            <UserMinus className="h-5 w-5" />
-                            <span className="text-sm font-medium text-destructive">Unfriend</span>
-                          </div>
-                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                        </button>
-                      ) : (
-                        <button onClick={() => { setContactInfoOpen(false); onAddFriend?.(); }} className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-primary/10 transition-colors">
-                          <div className="flex items-center gap-3 text-primary">
-                            <Plus className="h-5 w-5" />
-                            <span className="text-sm font-medium text-primary">Add Friend</span>
-                          </div>
-                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                        </button>
-                      )}
-                      <button onClick={() => { setContactInfoOpen(false); setConfirmBlock(true); }} className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-destructive/10 transition-colors">
-                        <div className="flex items-center gap-3 text-destructive">
-                          <ShieldOff className="h-5 w-5" />
-                          <span className="text-sm font-medium text-destructive">{blocked ? 'Unblock User' : 'Block User'}</span>
-                        </div>
-                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                      </button>
-                    </>
+                    <button onClick={() => { setContactInfoOpen(false); setConfirmBlock(true); }} className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-destructive/10 transition-colors">
+                      <div className="flex items-center gap-3 text-destructive">
+                        <ShieldOff className="h-5 w-5" />
+                        <span className="text-sm font-medium text-destructive">{blocked ? 'Unblock User' : 'Block User'}</span>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    </button>
                   )}
                 </div>
               </div>
