@@ -16,7 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Search, Phone, Video, Shield, Bell, Lock, Palette, TextQuote,
   Smartphone, Eye, ChevronLeft, ChevronDown, LogOut, Plus, PhoneMissed, PhoneIncoming, PhoneOutgoing, Loader2,
-  Check, X, Download, KeyRound, MessageSquare, Users, UserCog, Code, Globe, Trash2
+  Check, X, Download, KeyRound, MessageSquare, Users, UserCog, Code, Globe, Trash2, VolumeX, UserMinus
 } from "lucide-react";
 import { ChatView } from "@/components/messaging/ChatView";
 import { CallOverlay } from "@/components/messaging/CallOverlay";
@@ -41,9 +41,13 @@ import {
   createGroupChat,
   leaveGroupChat,
   deleteGroupChat,
+  deleteChatHistory,
+  blockUser,
+  unfriendUser,
   type ChatSummary,
   type DirectoryUser,
 } from "@/lib/chat";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { subscribeCallHistory, clearCallHistory, type CallDoc } from "@/lib/webrtc";
 import { useCallManager } from "@/hooks/use-call-manager";
 import { useMessageNotifications } from "@/hooks/use-message-notifications";
@@ -137,6 +141,9 @@ export default function MessengerApp() {
   const [setupLockType, setSetupLockType] = useState<"pin" | "password" | "pattern" | null>(null);
   const [pinValue, setPinValue] = useState('');
   const [isExportingData, setIsExportingData] = useState(false);
+  const lastBackPressTimeRef = useRef(0);
+  const [activeLongPressChat, setActiveLongPressChat] = useState<any>(null);
+  const [confirmDeleteChat, setConfirmDeleteChat] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const callManager = useCallManager();
@@ -145,6 +152,23 @@ export default function MessengerApp() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const listener = CapApp.addListener('backButton', (info) => {
+      // 1. Dispatch custom event for child components (ChatView, Modals, etc.)
+      const event = new Event('hardwareBackPress', { cancelable: true });
+      window.dispatchEvent(event);
+      if (event.defaultPrevented) {
+        return; // Handled by a child component
+      }
+
+      // 2. Global modals in page.tsx
+      if (isProfileEditing || reauthOpen || confirmDeleteChat || activeLongPressChat) {
+         setIsProfileEditing(false);
+         setReauthOpen(false);
+         setConfirmDeleteChat(null);
+         setActiveLongPressChat(null);
+         return;
+      }
+
+      // 3. Sub-screens
       if (selectedOtherUid || selectedGroupId) {
         setSelectedOtherUid(null);
         setSelectedGroupId(null);
@@ -168,17 +192,19 @@ export default function MessengerApp() {
         return;
       }
 
-      if (info.canGoBack) {
-        window.history.back();
-      } else {
+      // 4. Double tap to exit when on homepage
+      if (Date.now() - lastBackPressTimeRef.current < 2000) {
         CapApp.exitApp();
+      } else {
+        lastBackPressTimeRef.current = Date.now();
+        toast({ description: "Press back again to exit" });
       }
     });
 
     return () => {
       listener.then(l => l.remove());
     };
-  }, [selectedOtherUid, selectedGroupId, activeTab, settingsView, chatSearchOpen]);
+  }, [selectedOtherUid, selectedGroupId, activeTab, settingsView, chatSearchOpen, isProfileEditing, reauthOpen, confirmDeleteChat, activeLongPressChat, toast]);
 
   // App Lock: require the PIN once per app load if enabled.
   useEffect(() => {
@@ -302,12 +328,12 @@ export default function MessengerApp() {
           nickname: chat.nicknames?.[otherUid] || undefined,
         };
       })
-      .filter(Boolean) as Array<{
+      .filter((c) => c && c.lastMessage) as Array<{
         chatId: string; otherUid?: string; isGroup?: boolean; name: string; avatar: string;
         online: boolean; lastMessage: string; lastSenderId?: string; time: string; unread: number;
         participants?: string[]; quickEmoji?: string; nickname?: string;
       }>;
-  }, [chats, directoryMap, myFriends, user]);
+  }, [chats, user, directoryMap]);
 
   const totalUnread = chatRows.reduce((acc, c) => acc + c.unread, 0);
 
@@ -1489,6 +1515,10 @@ export default function MessengerApp() {
                       <button
                         key={chat.chatId}
                         onClick={() => openConversation(chat.otherUid ?? null, chat.chatId, chat.isGroup)}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          setActiveLongPressChat(chat);
+                        }}
                         className={cn(
                           "app-card-hover w-full rounded-[24px] px-3 py-3 text-left transition-all",
                           selectedOtherUid === chat.otherUid
@@ -1894,6 +1924,101 @@ export default function MessengerApp() {
               <Button onClick={() => handleSetAppLock(pinValue)} className="flex-1 rounded-xl bg-accent hover:bg-accent/90">Save</Button>
             </DialogFooter>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Chat Long Press Sheet */}
+      <Sheet open={!!activeLongPressChat} onOpenChange={(open) => {
+        if (!open) setActiveLongPressChat(null);
+      }}>
+        <SheetContent side="bottom" className="rounded-t-3xl p-4 bg-background border-none shadow-2xl z-[100] text-foreground">
+          <SheetHeader className="sr-only">
+            <SheetTitle>Chat Options</SheetTitle>
+          </SheetHeader>
+          {activeLongPressChat && (
+            <div className="flex flex-col gap-2 mt-2">
+              <Button variant="secondary" className="justify-start gap-3 h-14 rounded-2xl text-base bg-muted/50 hover:bg-muted" onClick={() => {
+                openConversation(activeLongPressChat.otherUid ?? null, activeLongPressChat.chatId, activeLongPressChat.isGroup);
+                setActiveLongPressChat(null);
+              }}>
+                <MessageSquare className="h-5 w-5" /> Open Chat
+              </Button>
+              <Button variant="secondary" className="justify-start gap-3 h-14 rounded-2xl text-base bg-muted/50 hover:bg-muted" onClick={() => { 
+                toast({ title: "Chat muted" }); 
+                setActiveLongPressChat(null); 
+              }}>
+                <VolumeX className="h-5 w-5" /> Mute
+              </Button>
+              {!activeLongPressChat.isGroup && activeLongPressChat.otherUid && myFriends.includes(activeLongPressChat.otherUid) && (
+                <Button variant="secondary" className="justify-start gap-3 h-14 rounded-2xl text-base bg-muted/50 hover:bg-muted text-destructive hover:text-destructive" onClick={async () => {
+                  try {
+                    await unfriendUser(user!.uid, activeLongPressChat.otherUid);
+                    toast({ title: "User unfriended" });
+                    setActiveLongPressChat(null);
+                  } catch (e: any) {
+                    toast({ title: "Failed to unfriend user", description: e.message, variant: "destructive" });
+                  }
+                }}>
+                  <UserMinus className="h-5 w-5" /> Unfriend
+                </Button>
+              )}
+              {!activeLongPressChat.isGroup && activeLongPressChat.otherUid && (
+                <Button variant="secondary" className="justify-start gap-3 h-14 rounded-2xl text-base bg-muted/50 hover:bg-muted" onClick={async () => {
+                  try {
+                    await blockUser(user!.uid, activeLongPressChat.otherUid);
+                    toast({ title: "User blocked" });
+                    setActiveLongPressChat(null);
+                  } catch (e: any) {
+                    toast({ title: "Failed to block user", description: e.message, variant: "destructive" });
+                  }
+                }}>
+                  <Shield className="h-5 w-5" /> Block
+                </Button>
+              )}
+              <Button variant="secondary" className="justify-start gap-3 h-14 rounded-2xl text-base text-destructive hover:text-destructive bg-destructive/10 hover:bg-destructive/20" onClick={() => {
+                setConfirmDeleteChat(activeLongPressChat);
+                setActiveLongPressChat(null);
+              }}>
+                <Trash2 className="h-5 w-5" /> Delete
+              </Button>
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
+
+      {/* Confirm Delete Chat Dialog */}
+      <Dialog open={!!confirmDeleteChat} onOpenChange={(open) => {
+        if (!open) setConfirmDeleteChat(null);
+      }}>
+        <DialogContent className="max-w-xs rounded-3xl">
+          <DialogHeader>
+            <DialogTitle>Delete Chat?</DialogTitle>
+            <DialogDescription>
+              This will permanently remove the chat history for you. Are you sure?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex-row gap-2 mt-4">
+            <Button variant="ghost" onClick={() => setConfirmDeleteChat(null)} className="flex-1 rounded-xl">Cancel</Button>
+            <Button variant="destructive" onClick={async () => {
+              if (confirmDeleteChat) {
+                try {
+                  if (confirmDeleteChat.isGroup) {
+                    await deleteGroupChat(confirmDeleteChat.chatId);
+                  } else {
+                    await deleteChatHistory(confirmDeleteChat.chatId);
+                  }
+                  toast({ title: "Chat deleted" });
+                  if (activeChatId === confirmDeleteChat.chatId) {
+                    setSelectedOtherUid(null);
+                    setSelectedGroupId(null);
+                  }
+                } catch (e: any) {
+                  toast({ title: "Failed to delete chat", description: e.message, variant: "destructive" });
+                }
+                setConfirmDeleteChat(null);
+              }
+            }} className="flex-1 rounded-xl">Delete</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

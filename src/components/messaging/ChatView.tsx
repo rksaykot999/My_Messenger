@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { ArrowLeft, Phone, PhoneOff, Video, Plus, Send, Image as ImageIcon, Camera as CameraIcon, Film, Info, Trash2, ShieldOff, ShieldCheck, UserRound, Loader2, Mail, Smile, Reply, X, Search, ChevronUp, ChevronDown, MessageSquare, ChevronRight, UserMinus, Download, LogOut, Mic, Pencil, Paperclip as FileIcon, Edit3 } from "lucide-react";
+import { ArrowLeft, Phone, PhoneOff, Video, Plus, Send, Image as ImageIcon, Camera as CameraIcon, Film, Info, Trash2, ShieldOff, ShieldCheck, UserRound, Loader2, Mail, Smile, Reply, X, Search, ChevronUp, ChevronDown, MessageSquare, ChevronRight, UserMinus, Download, LogOut, Mic, Pencil, Paperclip as FileIcon, Edit3, Copy } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -313,6 +313,48 @@ export function ChatView({
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, [scrollToBottom]);
+
+  // Handle Android hardware back button for internal UI states
+  useEffect(() => {
+    const handleHardwareBack = (e: Event) => {
+      if (viewMedia) {
+        e.preventDefault();
+        setViewMedia(null);
+        return;
+      }
+      if (activeLongPressMsg) {
+        e.preventDefault();
+        setActiveLongPressMsg(null);
+        return;
+      }
+      if (contactInfoOpen) {
+        e.preventDefault();
+        setContactInfoOpen(false);
+        return;
+      }
+      if (searchOpen) {
+        e.preventDefault();
+        setSearchOpen(false);
+        return;
+      }
+      if (infoOpen) {
+        e.preventDefault();
+        setInfoOpen(false);
+        return;
+      }
+      if (confirmDelete || confirmBlock || confirmLeave || confirmDeleteGroup || confirmUnfriend) {
+        e.preventDefault();
+        setConfirmDelete(false);
+        setConfirmBlock(false);
+        setConfirmLeave(false);
+        setConfirmDeleteGroup(false);
+        setConfirmUnfriend(false);
+        return;
+      }
+    };
+    window.addEventListener('hardwareBackPress', handleHardwareBack);
+    return () => window.removeEventListener('hardwareBackPress', handleHardwareBack);
+  }, [viewMedia, activeLongPressMsg, contactInfoOpen, searchOpen, infoOpen, confirmDelete, confirmBlock, confirmLeave, confirmDeleteGroup, confirmUnfriend]);
 
   // Clear my typing flag when leaving the conversation.
   useEffect(() => {
@@ -1566,10 +1608,13 @@ export function ChatView({
                 <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2 px-2">Quick Actions</h4>
                 <div className="bg-muted/10 border border-border/40 rounded-[24px] p-2 space-y-1">
                   {!chat.isGroup && (
-                    <Button variant="ghost" size="sm" onClick={() => { setContactInfoOpen(false); setTimeout(() => { setNewNickname(chat.nickname || chat.name); setEditNicknameOpen(true); }, 100); }} className="justify-start gap-3 rounded-xl px-4 py-6 font-semibold w-full">
-                      <div className="bg-muted p-2 rounded-lg text-primary"><Edit3 className="h-5 w-5" /></div>
-                      Change Nickname
-                    </Button>
+                    <button onClick={() => { setContactInfoOpen(false); setTimeout(() => { setNewNickname(chat.nickname || chat.name); setEditNicknameOpen(true); }, 100); }} className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-muted/20 transition-colors">
+                      <div className="flex items-center gap-3 text-primary">
+                        <Edit3 className="h-5 w-5" />
+                        <span className="text-sm font-medium">Change Nickname</span>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    </button>
                   )}
                   <button onClick={() => setContactInfoOpen(false)} className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-muted/20 transition-colors">
                     <div className="flex items-center gap-3 text-primary">
@@ -1581,25 +1626,37 @@ export function ChatView({
                   {!chat.isGroup && (
                     <>
                       {isFriend ? (
-                        <Button variant="ghost" size="sm" onClick={() => { setContactInfoOpen(false); setTimeout(() => setConfirmUnfriend(true), 100); }} className="justify-start gap-3 rounded-xl px-4 py-6 font-semibold text-destructive hover:bg-destructive/10 hover:text-destructive w-full">
-                          <div className="bg-destructive/10 p-2 rounded-lg"><UserMinus className="h-5 w-5" /></div>
-                          Unfriend
-                        </Button>
+                        <button onClick={() => { setContactInfoOpen(false); setTimeout(() => setConfirmUnfriend(true), 100); }} className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-destructive/10 transition-colors">
+                          <div className="flex items-center gap-3 text-destructive">
+                            <UserMinus className="h-5 w-5" />
+                            <span className="text-sm font-medium text-destructive">Unfriend</span>
+                          </div>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        </button>
                       ) : isRequestSent ? (
-                        <Button variant="ghost" size="sm" onClick={() => { setContactInfoOpen(false); setTimeout(() => onCancelRequest?.(), 100); }} className="justify-start gap-3 rounded-xl px-4 py-6 font-semibold text-destructive hover:bg-destructive/10 hover:text-destructive w-full">
-                          <div className="bg-destructive/10 p-2 rounded-lg"><X className="h-5 w-5" /></div>
-                          Cancel Request
-                        </Button>
+                        <button onClick={() => { setContactInfoOpen(false); setTimeout(() => onCancelRequest?.(), 100); }} className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-destructive/10 transition-colors">
+                          <div className="flex items-center gap-3 text-destructive">
+                            <X className="h-5 w-5" />
+                            <span className="text-sm font-medium text-destructive">Cancel Request</span>
+                          </div>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        </button>
                       ) : isRequestReceived ? (
-                        <Button variant="ghost" size="sm" onClick={() => { setContactInfoOpen(false); setTimeout(() => onAcceptRequest?.(), 100); }} className="justify-start gap-3 rounded-xl px-4 py-6 font-semibold text-primary hover:bg-primary/10 w-full">
-                          <div className="bg-primary/10 p-2 rounded-lg"><Plus className="h-5 w-5" /></div>
-                          Accept Request
-                        </Button>
+                        <button onClick={() => { setContactInfoOpen(false); setTimeout(() => onAcceptRequest?.(), 100); }} className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-primary/10 transition-colors">
+                          <div className="flex items-center gap-3 text-primary">
+                            <Plus className="h-5 w-5" />
+                            <span className="text-sm font-medium">Accept Request</span>
+                          </div>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        </button>
                       ) : (
-                        <Button variant="ghost" size="sm" onClick={() => { setContactInfoOpen(false); setTimeout(() => onAddFriend?.(), 100); }} className="justify-start gap-3 rounded-xl px-4 py-6 font-semibold text-primary hover:bg-primary/10 w-full">
-                          <div className="bg-primary/10 p-2 rounded-lg"><Plus className="h-5 w-5" /></div>
-                          Add Friend
-                        </Button>
+                        <button onClick={() => { setContactInfoOpen(false); setTimeout(() => onAddFriend?.(), 100); }} className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-primary/10 transition-colors">
+                          <div className="flex items-center gap-3 text-primary">
+                            <Plus className="h-5 w-5" />
+                            <span className="text-sm font-medium">Add Friend</span>
+                          </div>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        </button>
                       )}
                     </>
                   )}
@@ -1807,7 +1864,7 @@ export function ChatView({
           {activeLongPressMsg && (
             <div className="flex flex-col gap-2 mt-2">
                {showMobileEmoji ? (
-                 <div className="flex flex-col items-center w-full h-[65dvh] max-h-[450px]">
+                 <div className="flex flex-col items-center w-full h-[400px]">
                     <div className="w-full flex-1 min-h-0">
                       <EmojiPicker 
                         onEmojiClick={(emojiData) => {
@@ -1835,6 +1892,11 @@ export function ChatView({
                    <Button variant="secondary" className="justify-start gap-3 h-14 rounded-2xl text-base bg-muted/50 hover:bg-muted" onClick={() => { setReplyTo(activeLongPressMsg); setActiveLongPressMsg(null); }}>
                      <Reply className="h-5 w-5" /> Reply
                    </Button>
+                   {(activeLongPressMsg.type === "text" || !activeLongPressMsg.type) && (
+                     <Button variant="secondary" className="justify-start gap-3 h-14 rounded-2xl text-base bg-muted/50 hover:bg-muted" onClick={() => { navigator.clipboard.writeText(activeLongPressMsg.text || ""); toast({ title: "Copied to clipboard" }); setActiveLongPressMsg(null); }}>
+                       <Copy className="h-5 w-5" /> Copy
+                     </Button>
+                   )}
                    {activeLongPressMsg.senderId === user?.uid && (activeLongPressMsg.type === "text" || !activeLongPressMsg.type) && (
                      <Button variant="secondary" className="justify-start gap-3 h-14 rounded-2xl text-base bg-muted/50 hover:bg-muted" onClick={() => { setEditingMsg(activeLongPressMsg); setInputText(activeLongPressMsg.text); setActiveLongPressMsg(null); setTimeout(() => document.querySelector('input')?.focus(), 100); }}>
                        <Pencil className="h-5 w-5" /> Edit
