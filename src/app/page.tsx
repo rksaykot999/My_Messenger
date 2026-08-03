@@ -1585,7 +1585,7 @@ export default function MessengerApp() {
                       </div>
                       <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-none">
                         {discoverOnlinePeople.map((person) => {
-                          const isFriend = myFriends.includes(person.uid) || chats.some(c => !c.isGroup && c.participants.includes(person.uid));
+                          const isFriend = myFriends.includes(person.uid);
                           return (
                             <div key={person.uid} className="group flex flex-col items-center gap-2 min-w-[80px]">
                               <button onClick={() => isFriend ? openConversation(person.uid) : null} className="relative">
@@ -1623,7 +1623,7 @@ export default function MessengerApp() {
                         </div>
                       )}
                       {filteredDirectory.map((person) => {
-                        const isFriend = myFriends.includes(person.uid) || chats.some(c => !c.isGroup && c.participants.includes(person.uid));
+                        const isFriend = myFriends.includes(person.uid);
                         const hasOutgoing = outgoingRequests.includes(person.uid);
                         const hasIncoming = incomingRequests.includes(person.uid);
                         return (
@@ -1772,6 +1772,7 @@ export default function MessengerApp() {
                   amIBlocked={selectedPerson.blockedUsers?.includes(user?.uid as string)}
                   isFriend={myFriends.includes(selectedPerson.uid)}
                   onBack={() => setSelectedOtherUid(null)}
+                  onAddFriend={() => handleSendFriendRequest(selectedPerson.uid)}
                   onCall={(type) => callManager.startCall(
                     { id: selectedPerson.uid, name: selectedPerson.name, avatar: selectedPerson.photoURL },
                     type
@@ -2086,7 +2087,7 @@ export default function MessengerApp() {
                 <AvatarFallback className="text-xl">{selectedUserDetails?.name[0]}</AvatarFallback>
               </Avatar>
               
-              <div className="flex items-start justify-between gap-4 mb-6">
+              <div className="space-y-4 mb-6">
                 <div className="space-y-1">
                   <h2 className="text-2xl font-bold font-headline">{selectedUserDetails?.name}</h2>
                   {selectedUserDetails?.status && (
@@ -2095,13 +2096,13 @@ export default function MessengerApp() {
                 </div>
                 
                 {user && selectedUserDetails && user.uid !== selectedUserDetails.uid && (
-                  <div className="shrink-0 mt-1">
+                  <div className="flex items-center gap-3">
                     {myFriends.includes(selectedUserDetails.uid) ? (
-                      <Button variant="outline" size="sm" className="rounded-full" onClick={() => openConversation(selectedUserDetails.uid)}>
+                      <Button variant="outline" className="rounded-full flex-1" onClick={() => openConversation(selectedUserDetails.uid)}>
                         <MessageSquare className="h-4 w-4 mr-2" /> Message
                       </Button>
                     ) : outgoingRequests.includes(selectedUserDetails.uid) ? (
-                      <Button variant="secondary" size="sm" className="rounded-full bg-muted-foreground/20 text-muted-foreground hover:bg-muted-foreground/30" onClick={async () => {
+                      <Button variant="secondary" className="rounded-full bg-muted-foreground/20 text-muted-foreground hover:bg-muted-foreground/30 flex-1" onClick={async () => {
                         try {
                           await cancelFriendRequest(user.uid, selectedUserDetails.uid);
                           toast({ title: "Request Cancelled" });
@@ -2112,7 +2113,7 @@ export default function MessengerApp() {
                         Cancel Request
                       </Button>
                     ) : incomingRequests.includes(selectedUserDetails.uid) ? (
-                      <Button variant="default" size="sm" className="rounded-full" onClick={async () => {
+                      <Button variant="default" className="rounded-full flex-1" onClick={async () => {
                         try {
                           await acceptFriendRequest(user.uid, selectedUserDetails.uid);
                           toast({ title: "Request Accepted" });
@@ -2123,7 +2124,7 @@ export default function MessengerApp() {
                         Accept Request
                       </Button>
                     ) : (
-                      <Button variant="default" size="sm" className="rounded-full bg-[#0084ff] hover:bg-[#0084ff]/90 text-white" onClick={async () => {
+                      <Button variant="default" className="rounded-full bg-[#0084ff] hover:bg-[#0084ff]/90 text-white flex-1" onClick={async () => {
                         try {
                           await sendFriendRequest(user.uid, selectedUserDetails.uid);
                           toast({ title: "Request Sent" });

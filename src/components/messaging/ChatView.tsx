@@ -96,6 +96,7 @@ interface ChatViewProps {
   onLeaveGroup?: () => void;
   onDeleteGroup?: () => void;
   onUnfriend?: () => void;
+  onAddFriend?: () => void;
   embedded?: boolean;
 }
 
@@ -106,7 +107,7 @@ const PICKER_EMOJIS = ["😀","😁","😂","🤣","😊","😍","😘","😎","
 // probably closed the tab without clearing it).
 const TYPING_TTL_MS = 6000;
 
-export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, onUnfriend, isBlocked, amIBlocked, isFriend, embedded = false }: ChatViewProps) {
+export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, onUnfriend, onAddFriend, isBlocked, amIBlocked, isFriend, embedded = false }: ChatViewProps) {
   const displayName = chat.nickname || chat.name;
   const { user } = useAuth();
   const { settings } = useSettings();
@@ -1333,9 +1334,9 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, on
                 // When focusing, keyboard might take a moment to appear
                 setTimeout(() => scrollToBottom(true), 300);
               }}
-              placeholder={isBlocked ? "You've blocked this user" : amIBlocked ? "You cannot reply to this conversation" : (!chat.isGroup && !isFriend) ? "You must be friends to message" : "Aa"}
+              placeholder={isBlocked ? "You've blocked this user" : amIBlocked ? "You cannot reply" : (!chat.isGroup && !isFriend) ? "Must be friends to message" : "Aa"}
               disabled={inputDisabled}
-              className="flex-1 bg-transparent border-0 focus-visible:ring-0 text-[#E4E6EB] placeholder:text-[#B0B3B8] h-10 px-3 shadow-none focus-visible:ring-offset-0 disabled:opacity-50"
+              className="flex-1 bg-transparent border-0 focus-visible:ring-0 text-[#E4E6EB] placeholder:text-[#B0B3B8] h-10 pl-4 pr-3 shadow-none focus-visible:ring-offset-0 disabled:opacity-50 text-[15px]"
             />
             <Popover>
               <PopoverTrigger asChild>
@@ -1501,13 +1502,23 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, on
                   )}
                   {!chat.isGroup && (
                     <>
-                      <button onClick={() => { setContactInfoOpen(false); setConfirmUnfriend(true); }} className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-destructive/10 transition-colors">
-                        <div className="flex items-center gap-3 text-destructive">
-                          <UserMinus className="h-5 w-5" />
-                          <span className="text-sm font-medium text-destructive">Unfriend</span>
-                        </div>
-                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                      </button>
+                      {isFriend ? (
+                        <button onClick={() => { setContactInfoOpen(false); setConfirmUnfriend(true); }} className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-destructive/10 transition-colors">
+                          <div className="flex items-center gap-3 text-destructive">
+                            <UserMinus className="h-5 w-5" />
+                            <span className="text-sm font-medium text-destructive">Unfriend</span>
+                          </div>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        </button>
+                      ) : (
+                        <button onClick={() => { setContactInfoOpen(false); onAddFriend?.(); }} className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-primary/10 transition-colors">
+                          <div className="flex items-center gap-3 text-primary">
+                            <Plus className="h-5 w-5" />
+                            <span className="text-sm font-medium text-primary">Add Friend</span>
+                          </div>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        </button>
+                      )}
                       <button onClick={() => { setContactInfoOpen(false); setConfirmBlock(true); }} className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-destructive/10 transition-colors">
                         <div className="flex items-center gap-3 text-destructive">
                           <ShieldOff className="h-5 w-5" />
