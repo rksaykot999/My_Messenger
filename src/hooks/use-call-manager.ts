@@ -30,6 +30,8 @@ export function useCallManager() {
   const { user, profile } = useAuth();
   const [incomingCall, setIncomingCall] = useState<(CallDoc & { id: string }) | null>(null);
   const [activeCall, setActiveCall] = useState<ActiveCallState | null>(null);
+  const activeCallRef = useRef<ActiveCallState | null>(null);
+  activeCallRef.current = activeCall;
   const sessionRef = useRef<CallSession | null>(null);
 
   // Listen for calls addressed to me.
@@ -64,7 +66,7 @@ export function useCallManager() {
 
   const endLocalSession = useCallback(async (finalStatus: "ended" | "declined" = "ended") => {
     const session = sessionRef.current;
-    const currentActiveCall = activeCall; // Capture before nulling
+    const currentActiveCall = activeCallRef.current; // Capture before nulling
     sessionRef.current = null;
     setActiveCall(null);
     setIncomingCall(null);
@@ -87,7 +89,7 @@ export function useCallManager() {
          console.error("Failed to log call message", e);
        }
     }
-  }, [activeCall, user]);
+  }, [user]);
 
   const startCall = useCallback(
     async (callee: { id: string; name: string; avatar: string }, type: CallType) => {

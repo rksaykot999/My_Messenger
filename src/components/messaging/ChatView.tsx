@@ -1805,16 +1805,20 @@ export function ChatView({
           {activeLongPressMsg && (
             <div className="flex flex-col gap-2 mt-2">
                {showMobileEmoji ? (
-                 <div className="flex flex-col items-center">
-                    <EmojiPicker 
-                      onEmojiClick={(emojiData) => {
-                        handleReact(activeLongPressMsg, emojiData.emoji);
-                        setActiveLongPressMsg(null);
-                        setShowMobileEmoji(false);
-                      }}
-                      theme={settings.theme === 'dark' ? Theme.DARK : Theme.LIGHT}
-                    />
-                    <Button variant="ghost" className="w-full mt-2" onClick={() => setShowMobileEmoji(false)}>Back</Button>
+                 <div className="flex flex-col items-center w-full h-[65dvh] max-h-[450px]">
+                    <div className="w-full flex-1 min-h-0">
+                      <EmojiPicker 
+                        onEmojiClick={(emojiData) => {
+                          handleReact(activeLongPressMsg, emojiData.emoji);
+                          setActiveLongPressMsg(null);
+                          setShowMobileEmoji(false);
+                        }}
+                        theme={settings.theme === 'dark' ? Theme.DARK : Theme.LIGHT}
+                        width="100%"
+                        height="100%"
+                      />
+                    </div>
+                    <Button variant="ghost" className="w-full mt-2 shrink-0" onClick={() => setShowMobileEmoji(false)}>Back</Button>
                  </div>
                ) : (
                  <>

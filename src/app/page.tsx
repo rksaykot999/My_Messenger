@@ -150,24 +150,24 @@ export default function MessengerApp() {
         setSelectedGroupId(null);
         return;
       }
-      
+
       if (activeTab === 'settings' && settingsView !== 'main') {
         setSettingsView('main');
         return;
       }
-      
+
       if (activeTab === 'chats' && chatSearchOpen) {
         setChatSearchOpen(false);
         setChatSearchQuery('');
         setChatFilter('all');
         return;
       }
-      
+
       if (activeTab !== 'chats') {
         setActiveTab('chats');
         return;
       }
-      
+
       if (info.canGoBack) {
         window.history.back();
       } else {
@@ -218,10 +218,10 @@ export default function MessengerApp() {
 
   // Handle Android/Web back button to close sub-screens instead of exiting app
   const isSubScreenActive = !!(
-    selectedOtherUid || 
-    selectedGroupId || 
-    isCreateGroupOpen || 
-    chatSearchOpen || 
+    selectedOtherUid ||
+    selectedGroupId ||
+    isCreateGroupOpen ||
+    chatSearchOpen ||
     settingsView !== 'main'
   );
 
@@ -595,16 +595,16 @@ export default function MessengerApp() {
       // Dynamically import jsPDF to avoid SSR issues
       const { jsPDF } = await import("jspdf");
       const doc = new jsPDF();
-      
+
       doc.setFontSize(22);
       doc.text("My Messenger - Data Export", 20, 20);
-      
+
       doc.setFontSize(16);
       doc.text("Profile Information", 20, 35);
-      
+
       doc.setFontSize(12);
       let y = 45;
-      
+
       const addRow = (label: string, value: string) => {
         doc.setFont("helvetica", "bold");
         doc.text(`${label}:`, 20, y);
@@ -614,7 +614,7 @@ export default function MessengerApp() {
         doc.text(splitText, 60, y);
         y += 8 * splitText.length;
       };
-      
+
       addRow("Name", profile.name);
       addRow("Email", profile.email);
       addRow("Status", profile.status);
@@ -623,12 +623,12 @@ export default function MessengerApp() {
       addRow("Location", profile.location || "");
       addRow("Website", profile.website || "");
       addRow("Occupation", profile.occupation || "");
-      
+
       const dateString = new Date().toLocaleDateString();
       addRow("Export Date", dateString);
-      
+
       doc.save(`my-messenger-data-${profile.name.replace(/\s+/g, '-').toLowerCase()}.pdf`);
-      
+
       toast({ title: "Download Complete", description: "Your data has been exported as a PDF." });
     } catch (error: any) {
       console.error(error);
@@ -709,524 +709,524 @@ export default function MessengerApp() {
     return (
       <div className="fixed inset-0 flex flex-col h-[100dvh] w-full overflow-hidden">
         <ChatView
-        chat={{
-          id: selectedPerson.uid,
-          name: selectedPerson.name,
-          avatar: selectedPerson.photoURL,
-          online: !!selectedPerson.online,
-          status: selectedPerson.status,
-          email: selectedPerson.email,
-          lastSeen: selectedPerson.lastSeen,
-          quickEmoji: chats.find(c => c.id === activeChatId)?.quickEmoji,
-          nickname: chats.find(c => c.id === activeChatId)?.nicknames?.[selectedPerson.uid],
-          location: selectedPerson.location,
-          website: selectedPerson.website,
-          occupation: selectedPerson.occupation
-        }}
-        isBlocked={blockedUsers.includes(selectedPerson.uid)}
-        amIBlocked={selectedPerson.blockedUsers?.includes(user?.uid as string)}
-        isFriend={myFriends.includes(selectedPerson.uid)}
-        isRequestSent={outgoingRequests.includes(selectedPerson.uid)}
-        isRequestReceived={incomingRequests.includes(selectedPerson.uid)}
-        onCancelRequest={() => handleCancelFriendRequest(selectedPerson.uid)}
-        onAcceptRequest={() => handleAcceptFriendRequest(selectedPerson.uid)}
-        onBack={() => {
-          if (isMobile && window.history.state?.chatOpen) {
-            window.history.back();
-          } else {
-            setSelectedOtherUid(null);
-          }
-        }}
-        onUnfriend={() => {
-          if (isMobile && window.history.state?.chatOpen) {
-            window.history.back();
-          } else {
-            setSelectedOtherUid(null);
-          }
-          setActiveTab('discover');
-        }}
-        onCall={(type) => callManager.startCall(
-          { id: selectedPerson.uid, name: selectedPerson.name, avatar: selectedPerson.photoURL },
-          type
-        )}
-        onAddFriend={() => handleSendFriendRequest(selectedPerson.uid)}
-      />
+          chat={{
+            id: selectedPerson.uid,
+            name: selectedPerson.name,
+            avatar: selectedPerson.photoURL,
+            online: !!selectedPerson.online,
+            status: selectedPerson.status,
+            email: selectedPerson.email,
+            lastSeen: selectedPerson.lastSeen,
+            quickEmoji: chats.find(c => c.id === activeChatId)?.quickEmoji,
+            nickname: chats.find(c => c.id === activeChatId)?.nicknames?.[selectedPerson.uid],
+            location: selectedPerson.location,
+            website: selectedPerson.website,
+            occupation: selectedPerson.occupation
+          }}
+          isBlocked={blockedUsers.includes(selectedPerson.uid)}
+          amIBlocked={selectedPerson.blockedUsers?.includes(user?.uid as string)}
+          isFriend={myFriends.includes(selectedPerson.uid)}
+          isRequestSent={outgoingRequests.includes(selectedPerson.uid)}
+          isRequestReceived={incomingRequests.includes(selectedPerson.uid)}
+          onCancelRequest={() => handleCancelFriendRequest(selectedPerson.uid)}
+          onAcceptRequest={() => handleAcceptFriendRequest(selectedPerson.uid)}
+          onBack={() => {
+            if (isMobile && window.history.state?.chatOpen) {
+              window.history.back();
+            } else {
+              setSelectedOtherUid(null);
+            }
+          }}
+          onUnfriend={() => {
+            if (isMobile && window.history.state?.chatOpen) {
+              window.history.back();
+            } else {
+              setSelectedOtherUid(null);
+            }
+            setActiveTab('discover');
+          }}
+          onCall={(type) => callManager.startCall(
+            { id: selectedPerson.uid, name: selectedPerson.name, avatar: selectedPerson.photoURL },
+            type
+          )}
+          onAddFriend={() => handleSendFriendRequest(selectedPerson.uid)}
+        />
       </div>
     );
   } else if (selectedGroupChat && isMobile) {
     return (
       <div className="fixed inset-0 flex flex-col h-[100dvh] w-full overflow-hidden">
         <ChatView
-        chat={{
-          id: selectedGroupChat.id,
-          name: selectedGroupChat.groupName || 'Group Chat',
-          avatar: selectedGroupChat.groupAvatar || '',
-          isGroup: true,
-          participants: selectedGroupChat.participants.map(p => ({
-            uid: p,
-            name: directoryMap[p]?.name || 'Unknown',
-            avatar: directoryMap[p]?.photoURL || '',
-          })),
-          adminId: selectedGroupChat.adminId,
-          quickEmoji: selectedGroupChat.quickEmoji,
-        }}
-        isBlocked={false}
-        onLeaveGroup={() => handleLeaveGroup(selectedGroupChat.id)}
-        onDeleteGroup={() => handleDeleteGroup(selectedGroupChat.id)}
-        onBack={() => {
-          if (isMobile && window.history.state?.chatOpen) {
-            window.history.back();
-          } else {
-            setSelectedGroupId(null);
-          }
-        }}
-      />
+          chat={{
+            id: selectedGroupChat.id,
+            name: selectedGroupChat.groupName || 'Group Chat',
+            avatar: selectedGroupChat.groupAvatar || '',
+            isGroup: true,
+            participants: selectedGroupChat.participants.map(p => ({
+              uid: p,
+              name: directoryMap[p]?.name || 'Unknown',
+              avatar: directoryMap[p]?.photoURL || '',
+            })),
+            adminId: selectedGroupChat.adminId,
+            quickEmoji: selectedGroupChat.quickEmoji,
+          }}
+          isBlocked={false}
+          onLeaveGroup={() => handleLeaveGroup(selectedGroupChat.id)}
+          onDeleteGroup={() => handleDeleteGroup(selectedGroupChat.id)}
+          onBack={() => {
+            if (isMobile && window.history.state?.chatOpen) {
+              window.history.back();
+            } else {
+              setSelectedGroupId(null);
+            }
+          }}
+        />
       </div>
     );
   }
 
   const renderSettingsContent = () => (
     <div className="space-y-6 animate-in fade-in duration-300">
-            {settingsView === 'main' ? (
-              <>
-                <div className="app-hero flex flex-col items-center rounded-[32px] p-6 text-center">
-                  <Avatar className="h-24 w-24 mb-4 ring-4 ring-background shadow-xl">
-                    <AvatarImage src={profile?.photoURL} />
-                    <AvatarFallback>{profile?.name?.[0]}</AvatarFallback>
-                  </Avatar>
-                  <h3 className="text-xl font-bold font-headline">{profile?.name}</h3>
-                  <p className="text-sm text-muted-foreground">{profile?.email}</p>
-                  <Button
-                    variant="outline"
-                    onClick={() => { 
-                      setEditName(profile?.name || ''); 
-                      setEditStatus(profile?.status || ''); 
-                      setEditBio(profile?.bio || '');
-                      setEditLocation(profile?.location || '');
-                      setEditWebsite(profile?.website || '');
-                      setEditOccupation(profile?.occupation || '');
-                      setIsProfileEditing(true); 
-                    }}
-                    className="mt-4 rounded-full px-6 text-xs h-8"
+      {settingsView === 'main' ? (
+        <>
+          <div className="app-hero flex flex-col items-center rounded-[32px] p-6 text-center">
+            <Avatar className="h-24 w-24 mb-4 ring-4 ring-background shadow-xl">
+              <AvatarImage src={profile?.photoURL} />
+              <AvatarFallback>{profile?.name?.[0]}</AvatarFallback>
+            </Avatar>
+            <h3 className="text-xl font-bold font-headline">{profile?.name}</h3>
+            <p className="text-sm text-muted-foreground">{profile?.email}</p>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setEditName(profile?.name || '');
+                setEditStatus(profile?.status || '');
+                setEditBio(profile?.bio || '');
+                setEditLocation(profile?.location || '');
+                setEditWebsite(profile?.website || '');
+                setEditOccupation(profile?.occupation || '');
+                setIsProfileEditing(true);
+              }}
+              className="mt-4 rounded-full px-6 text-xs h-8"
+            >
+              Edit Profile
+            </Button>
+          </div>
+
+          <div className="space-y-4">
+            <section>
+              <h4 className="app-section-label mb-3 ml-2">Notifications</h4>
+              <div className="app-surface rounded-[28px] overflow-hidden">
+                <div className="flex items-center justify-between p-4 border-b last:border-0">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-blue-100 p-2 rounded-lg"><Bell className="h-4 w-4 text-blue-600" /></div>
+                    <span className="text-sm font-medium">Message Notifications</span>
+                  </div>
+                  <Switch
+                    checked={settings.messageNotifications}
+                    onCheckedChange={(checked) => updateSettings({ messageNotifications: checked })}
+                  />
+                </div>
+                <div className="flex items-center justify-between p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-green-100 p-2 rounded-lg"><Phone className="h-4 w-4 text-green-600" /></div>
+                    <span className="text-sm font-medium">Calls</span>
+                  </div>
+                  <Switch
+                    checked={settings.callNotifications}
+                    onCheckedChange={(checked) => updateSettings({ callNotifications: checked })}
+                  />
+                </div>
+              </div>
+            </section>
+
+
+            <section>
+              <h4 className="app-section-label mb-3 ml-2">General</h4>
+              <div className="app-surface rounded-[28px] overflow-hidden">
+                {[
+                  { id: 'accountMode' as const, icon: UserCog, label: 'Account Mode' },
+                  { id: 'security' as const, icon: Shield, label: 'Account Security' },
+                  { id: 'theme' as const, icon: Palette, label: 'Theme & Appearance' },
+                  { id: 'privacy' as const, icon: Lock, label: 'Privacy Policy' },
+                  { id: 'developer' as const, icon: Code, label: 'Developer' },
+                ].map((item, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setSettingsView(item.id)}
+                    className="w-full flex items-center justify-between p-4 border-b last:border-0 hover:bg-muted/30"
                   >
-                    Edit Profile
-                  </Button>
-                </div>
-
-                <div className="space-y-4">
-                  <section>
-                    <h4 className="app-section-label mb-3 ml-2">Notifications</h4>
-                    <div className="app-surface rounded-[28px] overflow-hidden">
-                      <div className="flex items-center justify-between p-4 border-b last:border-0">
-                        <div className="flex items-center gap-3">
-                          <div className="bg-blue-100 p-2 rounded-lg"><Bell className="h-4 w-4 text-blue-600" /></div>
-                          <span className="text-sm font-medium">Message Notifications</span>
-                        </div>
-                        <Switch
-                          checked={settings.messageNotifications}
-                          onCheckedChange={(checked) => updateSettings({ messageNotifications: checked })}
-                        />
-                      </div>
-                      <div className="flex items-center justify-between p-4">
-                        <div className="flex items-center gap-3">
-                          <div className="bg-green-100 p-2 rounded-lg"><Phone className="h-4 w-4 text-green-600" /></div>
-                          <span className="text-sm font-medium">Calls</span>
-                        </div>
-                        <Switch
-                          checked={settings.callNotifications}
-                          onCheckedChange={(checked) => updateSettings({ callNotifications: checked })}
-                        />
-                      </div>
+                    <div className="flex items-center gap-3">
+                      <div className="bg-muted p-2 rounded-lg"><item.icon className="h-4 w-4 text-muted-foreground" /></div>
+                      <span className="text-sm font-medium">{item.label}</span>
                     </div>
-                  </section>
+                    <Badge variant="secondary" className="text-[10px] opacity-50">View</Badge>
+                  </button>
+                ))}
+              </div>
+            </section>
+            {settingsView !== 'main' && (
+              <Button
+                variant="ghost"
+                onClick={() => setSettingsView('main')}
+                className="w-full rounded-2xl h-12"
+              >
+                Back to settings
+              </Button>
+            )}
 
+            <div className="space-y-3">
+              <Button
+                variant="ghost"
+                onClick={() => logout()}
+                className="w-full text-destructive hover:text-destructive hover:bg-destructive/10 rounded-2xl h-12"
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Log Out
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={async () => {
+                  if (!confirm('Delete your account? This cannot be undone.')) return;
+                  try {
+                    await deleteAccount();
+                  } catch (err: any) {
+                    console.error(err);
+                    if (err?.code === 'auth/requires-recent-login') {
+                      setReauthError(null);
+                      setReauthEmail(profile?.email || '');
+                      setReauthPassword('');
+                      setReauthOpen(true);
+                    } else {
+                      alert('Account deletion failed. Please try again.');
+                    }
+                  }
+                }}
+                className="w-full rounded-2xl h-12"
+              >
+                Delete Account
+              </Button>
+            </div>
 
-                  <section>
-                    <h4 className="app-section-label mb-3 ml-2">General</h4>
-                    <div className="app-surface rounded-[28px] overflow-hidden">
-                      {[
-                        { id: 'accountMode' as const, icon: UserCog, label: 'Account Mode' },
-                        { id: 'security' as const, icon: Shield, label: 'Account Security' },
-                        { id: 'theme' as const, icon: Palette, label: 'Theme & Appearance' },
-                        { id: 'privacy' as const, icon: Lock, label: 'Privacy Policy' },
-                        { id: 'developer' as const, icon: Code, label: 'Developer' },
-                      ].map((item, i) => (
-                        <button
-                          key={i}
-                          onClick={() => setSettingsView(item.id)}
-                          className="w-full flex items-center justify-between p-4 border-b last:border-0 hover:bg-muted/30"
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="bg-muted p-2 rounded-lg"><item.icon className="h-4 w-4 text-muted-foreground" /></div>
-                            <span className="text-sm font-medium">{item.label}</span>
-                          </div>
-                          <Badge variant="secondary" className="text-[10px] opacity-50">View</Badge>
-                        </button>
-                      ))}
-                    </div>
-                  </section>
-                  {settingsView !== 'main' && (
-                    <Button
-                      variant="ghost"
-                      onClick={() => setSettingsView('main')}
-                      className="w-full rounded-2xl h-12"
-                    >
-                      Back to settings
-                    </Button>
-                  )}
-
-                  <div className="space-y-3">
-                    <Button
-                      variant="ghost"
-                      onClick={() => logout()}
-                      className="w-full text-destructive hover:text-destructive hover:bg-destructive/10 rounded-2xl h-12"
-                    >
-                      <LogOut className="h-4 w-4 mr-2" />
-                      Log Out
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      onClick={async () => {
-                        if (!confirm('Delete your account? This cannot be undone.')) return;
-                        try {
-                          await deleteAccount();
-                        } catch (err: any) {
-                          console.error(err);
-                          if (err?.code === 'auth/requires-recent-login') {
-                            setReauthError(null);
-                            setReauthEmail(profile?.email || '');
-                            setReauthPassword('');
-                            setReauthOpen(true);
-                          } else {
-                            alert('Account deletion failed. Please try again.');
-                          }
-                        }
-                      }}
-                      className="w-full rounded-2xl h-12"
-                    >
-                      Delete Account
-                    </Button>
-                  </div>
-
-                  <div className="mt-8 pb-4 text-center">
-                    <p className="text-xs font-medium text-muted-foreground/50 uppercase tracking-widest">Version</p>
-                    <p className="text-sm font-semibold text-muted-foreground/70">my_messenger_v1.2</p>
+            <div className="mt-8 pb-4 text-center">
+              <p className="text-xs font-medium text-muted-foreground/50 uppercase tracking-widest">Version</p>
+              <p className="text-sm font-semibold text-muted-foreground/70">My Messenger v1.3</p>
+            </div>
+          </div>
+        </>
+      ) : (
+        <div className="space-y-6">
+          {settingsView === 'security' && (
+            <div className="space-y-4">
+              <div className={cn("app-surface p-4 rounded-[28px] space-y-4 transition-all", isLockDropdownOpen && "relative z-[60]")}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h5 className="text-sm font-semibold">App Lock System</h5>
+                    <p className="text-xs text-muted-foreground">Select how to lock your app</p>
                   </div>
                 </div>
-              </>
-            ) : (
-              <div className="space-y-6">
-                {settingsView === 'security' && (
-                  <div className="space-y-4">
-                    <div className={cn("app-surface p-4 rounded-[28px] space-y-4 transition-all", isLockDropdownOpen && "relative z-[60]")}>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h5 className="text-sm font-semibold">App Lock System</h5>
-                          <p className="text-xs text-muted-foreground">Select how to lock your app</p>
-                        </div>
-                      </div>
-                      
-                      <div className="py-2 relative">
-                        <button 
-                          onClick={() => setIsLockDropdownOpen(!isLockDropdownOpen)}
-                          className="w-full rounded-xl bg-muted/50 hover:bg-muted/70 border border-transparent h-12 px-4 flex items-center justify-between focus:ring-2 focus:ring-accent/50 cursor-pointer font-medium transition-colors"
-                        >
-                          <span className="capitalize">{settings.appLockType === 'none' ? 'Disabled' : settings.appLockType}</span>
-                          <ChevronDown className={cn("h-4 w-4 opacity-50 transition-transform", isLockDropdownOpen && "rotate-180")} />
-                        </button>
-                        
-                        {isLockDropdownOpen && (
-                          <>
-                            <div 
-                              className="fixed inset-0 z-40" 
-                              onClick={() => setIsLockDropdownOpen(false)} 
-                            />
-                            <div className="absolute top-[calc(100%+8px)] left-0 w-full bg-card/95 backdrop-blur-xl text-card-foreground rounded-2xl shadow-xl border border-accent/20 z-50 overflow-hidden py-2 animate-in fade-in zoom-in-95 duration-150">
-                              {[
-                                { value: 'none', label: 'Disabled' },
-                                { value: 'pin', label: 'PIN' },
-                                { value: 'password', label: 'Password' },
-                                { value: 'pattern', label: 'Pattern' }
-                              ].map(option => (
-                                <button
-                                  key={option.value}
-                                  onClick={() => {
-                                    setIsLockDropdownOpen(false);
-                                    if (option.value === 'none') {
-                                      handleDisableAppLock();
-                                    } else if (option.value !== settings.appLockType) {
-                                      setSetupLockType(option.value as "pin" | "password" | "pattern");
-                                      setPinValue('');
-                                    }
-                                  }}
-                                  className="w-full text-left px-4 py-3 text-sm hover:bg-muted focus:bg-muted transition-colors flex items-center justify-between font-medium outline-none"
-                                >
-                                  {option.label}
-                                  {settings.appLockType === option.value && <Check className="h-4 w-4 text-primary" />}
-                                </button>
-                              ))}
-                            </div>
-                          </>
-                        )}
-                      </div>
-                      
-                      {settings.appLockType !== 'none' && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="rounded-xl w-full"
-                          onClick={() => { setPinValue(''); setSetupLockType(settings.appLockType as "pin" | "password" | "pattern"); }}
-                        >
-                          <KeyRound className="h-3.5 w-3.5 mr-2" /> Change {settings.appLockType}
-                        </Button>
-                      )}
-                    </div>
 
-                    <div className="app-surface p-4 rounded-[28px] space-y-4">
-                      <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 bg-primary/10 rounded-full flex items-center justify-center text-primary">
-                          <Shield className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <h5 className="text-sm font-semibold">Security Information</h5>
-                          <p className="text-xs text-muted-foreground">Why app lock is important</p>
-                        </div>
-                      </div>
-                      <p className="text-xs text-muted-foreground leading-relaxed">
-                        App lock adds an extra layer of security to your messages. Even if someone unlocks your phone, they won't be able to access your private conversations without your specific app lock PIN, password, or pattern. We use advanced local encryption to keep your data safe.
-                      </p>
-                    </div>
+                <div className="py-2 relative">
+                  <button
+                    onClick={() => setIsLockDropdownOpen(!isLockDropdownOpen)}
+                    className="w-full rounded-xl bg-muted/50 hover:bg-muted/70 border border-transparent h-12 px-4 flex items-center justify-between focus:ring-2 focus:ring-accent/50 cursor-pointer font-medium transition-colors"
+                  >
+                    <span className="capitalize">{settings.appLockType === 'none' ? 'Disabled' : settings.appLockType}</span>
+                    <ChevronDown className={cn("h-4 w-4 opacity-50 transition-transform", isLockDropdownOpen && "rotate-180")} />
+                  </button>
 
-                    <div className="app-surface p-4 rounded-[28px] space-y-4">
-                       <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 bg-primary/10 rounded-full flex items-center justify-center text-primary">
-                          <Lock className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <h5 className="text-sm font-semibold">Account Recovery</h5>
-                          <p className="text-xs text-muted-foreground">Manage your login credentials</p>
-                        </div>
-                      </div>
-                      <p className="text-xs text-muted-foreground leading-relaxed mb-4">
-                        If you ever forget your password, you can reset it securely via your registered email address. This ensures that you never lose access to your account permanently.
-                      </p>
-                      <Button variant="outline" className="w-full rounded-xl" onClick={handleChangePassword}>
-                        Reset Password by Email
-                      </Button>
-                    </div>
-                  </div>
-                )}
-
-                {settingsView === 'theme' && (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <button
-                        onClick={() => updateSettings({ theme: 'light' })}
-                        className={cn(
-                          "app-surface flex flex-col items-center gap-3 p-4 rounded-[28px] border-2 bg-background",
-                          settings.theme === 'light' ? "border-primary" : "border-border"
-                        )}
-                      >
-                        <div className="h-16 w-full bg-slate-50 rounded-lg border relative">
-                          {settings.theme === 'light' && <Check className="h-4 w-4 absolute top-1 right-1 text-primary" />}
-                        </div>
-                        <span className="text-xs font-semibold">Light Mode</span>
-                      </button>
-                      <button
-                        onClick={() => updateSettings({ theme: 'dark' })}
-                        className={cn(
-                          "flex flex-col items-center gap-3 p-4 rounded-[28px] border bg-slate-900 shadow-xl shadow-primary/10",
-                          settings.theme === 'dark' ? "border-2 border-primary" : "border-border"
-                        )}
-                      >
-                        <div className="h-16 w-full bg-slate-800 rounded-lg relative">
-                          {settings.theme === 'dark' && <Check className="h-4 w-4 absolute top-1 right-1 text-white" />}
-                        </div>
-                        <span className="text-xs font-semibold text-white">Dark Mode</span>
-                      </button>
-                    </div>
-                    <div className="app-surface p-4 rounded-[28px]">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium">Follow System Theme</span>
-                        <Switch
-                          checked={settings.theme === 'system'}
-                          onCheckedChange={(checked) => updateSettings({ theme: checked ? 'system' : 'light' })}
-                        />
-                      </div>
-                    </div>
-                    
-                    <div className="app-surface p-5 rounded-[28px] space-y-4">
-                      <span className="text-sm font-semibold block">Brand Color</span>
-                      <div className="flex items-center gap-4 flex-wrap">
-                        {(['blue', 'green', 'purple', 'orange', 'rose'] as const).map((color) => (
+                  {isLockDropdownOpen && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-40"
+                        onClick={() => setIsLockDropdownOpen(false)}
+                      />
+                      <div className="absolute top-[calc(100%+8px)] left-0 w-full bg-card/95 backdrop-blur-xl text-card-foreground rounded-2xl shadow-xl border border-accent/20 z-50 overflow-hidden py-2 animate-in fade-in zoom-in-95 duration-150">
+                        {[
+                          { value: 'none', label: 'Disabled' },
+                          { value: 'pin', label: 'PIN' },
+                          { value: 'password', label: 'Password' },
+                          { value: 'pattern', label: 'Pattern' }
+                        ].map(option => (
                           <button
-                            key={color}
-                            onClick={() => updateSettings({ themeColor: color })}
-                            className={cn(
-                              "h-12 w-12 rounded-full flex items-center justify-center transition-all",
-                              settings.themeColor === color ? "ring-2 ring-offset-2 ring-primary scale-110" : "hover:scale-105 opacity-80 hover:opacity-100",
-                              color === 'blue' && "bg-blue-600",
-                              color === 'green' && "bg-green-600",
-                              color === 'purple' && "bg-purple-600",
-                              color === 'orange' && "bg-orange-600",
-                              color === 'rose' && "bg-rose-600"
-                            )}
+                            key={option.value}
+                            onClick={() => {
+                              setIsLockDropdownOpen(false);
+                              if (option.value === 'none') {
+                                handleDisableAppLock();
+                              } else if (option.value !== settings.appLockType) {
+                                setSetupLockType(option.value as "pin" | "password" | "pattern");
+                                setPinValue('');
+                              }
+                            }}
+                            className="w-full text-left px-4 py-3 text-sm hover:bg-muted focus:bg-muted transition-colors flex items-center justify-between font-medium outline-none"
                           >
-                            {settings.themeColor === color && <Check className="h-6 w-6 text-white drop-shadow-md" />}
+                            {option.label}
+                            {settings.appLockType === option.value && <Check className="h-4 w-4 text-primary" />}
                           </button>
                         ))}
                       </div>
-                    </div>
-                    
-                    <div className="app-surface p-5 rounded-[28px] space-y-6">
-                      <div>
-                        <span className="text-sm font-semibold mb-3 block">Text Size</span>
-                        <div className="flex bg-primary/5 p-1 rounded-full items-center justify-between border border-primary/20">
-                          {(['small', 'medium', 'large'] as const).map(size => (
-                            <button
-                              key={size}
-                              onClick={() => updateSettings({ fontSize: size })}
-                              className={cn(
-                                "flex-1 text-xs font-semibold py-2.5 rounded-full capitalize transition-colors",
-                                settings.fontSize === size ? "bg-primary text-white shadow-md shadow-primary/20" : "text-muted-foreground hover:bg-primary/10"
-                              )}
-                            >
-                              {size}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="space-y-3">
-                        <span className="text-sm font-semibold">Font Style</span>
-                        <div className="grid grid-cols-2 gap-2">
-                          {(['system', 'inter', 'roboto', 'serif', 'mono'] as const).map(font => (
-                            <button
-                              key={font}
-                              onClick={() => updateSettings({ fontFamily: font })}
-                              className={cn(
-                                "text-xs font-medium py-3 px-3 rounded-xl border text-left capitalize transition-colors",
-                                settings.fontFamily === font ? "border-primary bg-primary/10 text-primary" : "border-border hover:bg-secondary/50 text-muted-foreground"
-                              )}
-                            >
-                              {font}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                      
-                      <div className="pt-4 border-t border-border/50">
-                        <span className="text-sm font-semibold mb-4 block text-muted-foreground">Chat Preview</span>
-                        <div className="bg-secondary/30 p-4 rounded-[24px] space-y-4 border border-border/50 relative overflow-hidden">
-                          {/* Left message */}
-                          <div className="flex gap-2">
-                            <div className="bg-primary text-white p-3.5 rounded-2xl rounded-tl-sm text-[length:inherit] max-w-[85%] shadow-sm">
-                              Hey! How does this text look?
-                            </div>
-                          </div>
-                          {/* Right message */}
-                          <div className="flex gap-2 justify-end">
-                            <div className="app-surface border border-border/40 p-3.5 rounded-2xl rounded-tr-sm text-[length:inherit] max-w-[85%] shadow-sm">
-                              Looks perfect to me! The new font is super clear. 🚀
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
+                    </>
+                  )}
+                </div>
 
-                {settingsView === 'developer' && (
-                  <div className="space-y-6">
-                    <div className="app-surface p-6 rounded-[32px] text-center space-y-4">
-                      <div className="w-24 h-24 mx-auto rounded-[32px] overflow-hidden shadow-lg border border-accent/20">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img 
-                          src="https://0.gravatar.com/avatar/f93ab0553fdd50e05eca8505fc4ed8e78d6e4956d495dc45b169837cd2ed7987?s=256" 
-                          alt="Saykot" 
-                          className="w-full h-full object-cover" 
-                        />
-                      </div>
-                      <div>
-                        <h3 className="text-xl font-bold font-headline">Saykot</h3>
-                        <p className="text-sm font-medium text-accent">Full-Stack Developer</p>
-                      </div>
-                      <div className="text-sm text-muted-foreground space-y-2 pb-2">
-                        <p>
-                          Hi! I'm Saykot, a passionate Full-Stack Developer based in Barisal, Bangladesh.
-                        </p>
-                        <p>
-                          I specialize in building modern, interactive, and scalable web applications using React, Next.js, Node.js, and other cutting-edge technologies. I love solving complex problems and creating seamless user experiences.
-                        </p>
-                      </div>
-                      <Button asChild className="w-full rounded-xl bg-gradient-to-r from-accent to-primary hover:opacity-90">
-                        <a href="https://saykot.vercel.app/" target="_blank" rel="noopener noreferrer">
-                          <Globe className="h-4 w-4 mr-2" /> View Portfolio
-                        </a>
-                      </Button>
-                    </div>
-                  </div>
-                )}
-
-                {settingsView === 'accountMode' && (
-                  <div className="space-y-4">
-                    <div className="app-surface p-4 rounded-[28px] space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                          <Label className="text-base font-semibold">Account Mode</Label>
-                          <p className="text-sm text-muted-foreground">
-                            {settings.accountMode === 'private'
-                              ? 'Private: Only friends can see your profile.'
-                              : 'Public: Everyone can see your profile.'}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                           <span className={cn("text-xs font-medium px-2 py-1 rounded-full",
-                             (settings?.accountMode || 'public') === 'private' ? "bg-amber-100 text-amber-700" : "bg-green-100 text-green-700")}>
-                             {(settings?.accountMode || 'public').toUpperCase()}
-                           </span>
-                           <Switch
-                             checked={(settings?.accountMode || 'public') === 'private'}
-                             onCheckedChange={(checked) => updateSettings({ accountMode: checked ? 'private' : 'public' })}
-                           />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {settingsView === 'privacy' && (
-                  <div className="space-y-4">
-                    <div className="app-surface prose prose-sm text-muted-foreground p-5 rounded-[28px] border border-border/40">
-                      <h3 className="text-foreground font-semibold text-base mb-3">Privacy & Data Policy</h3>
-                      <p className="mb-2">
-                        At <strong>My Messenger</strong>, your privacy is our highest priority. We are committed to protecting your personal information and ensuring a secure communication experience.
-                      </p>
-                      <ul className="list-disc pl-5 mb-3 space-y-1">
-                        <li><strong>End-to-End Security:</strong> Your messages and calls are processed securely. We employ industry-standard encryption to protect your data in transit and at rest.</li>
-                        <li><strong>Data Ownership:</strong> You retain full control over your personal data. Your profile information, contacts, and chat history are securely stored in your Firebase instance.</li>
-                        <li><strong>No Third-Party Tracking:</strong> We do not sell, rent, or share your personal data with third-party advertisers or data brokers under any circumstances.</li>
-                      </ul>
-                      <p>
-                        By using My Messenger, you consent to our data practices as outlined above. You can download a copy of your profile data at any time using the button below.
-                      </p>
-                    </div>
-                    <Button
-                      variant="outline"
-                      className="w-full rounded-xl"
-                      onClick={handleDownloadMyData}
-                      disabled={isExportingData}
-                    >
-                      {isExportingData ? (
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      ) : (
-                        <Download className="h-4 w-4 mr-2" />
-                      )}
-                      Download My Data
-                    </Button>
-                  </div>
+                {settings.appLockType !== 'none' && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="rounded-xl w-full"
+                    onClick={() => { setPinValue(''); setSetupLockType(settings.appLockType as "pin" | "password" | "pattern"); }}
+                  >
+                    <KeyRound className="h-3.5 w-3.5 mr-2" /> Change {settings.appLockType}
+                  </Button>
                 )}
               </div>
-            )}
+
+              <div className="app-surface p-4 rounded-[28px] space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 bg-primary/10 rounded-full flex items-center justify-center text-primary">
+                    <Shield className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h5 className="text-sm font-semibold">Security Information</h5>
+                    <p className="text-xs text-muted-foreground">Why app lock is important</p>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  App lock adds an extra layer of security to your messages. Even if someone unlocks your phone, they won't be able to access your private conversations without your specific app lock PIN, password, or pattern. We use advanced local encryption to keep your data safe.
+                </p>
+              </div>
+
+              <div className="app-surface p-4 rounded-[28px] space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 bg-primary/10 rounded-full flex items-center justify-center text-primary">
+                    <Lock className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h5 className="text-sm font-semibold">Account Recovery</h5>
+                    <p className="text-xs text-muted-foreground">Manage your login credentials</p>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed mb-4">
+                  If you ever forget your password, you can reset it securely via your registered email address. This ensures that you never lose access to your account permanently.
+                </p>
+                <Button variant="outline" className="w-full rounded-xl" onClick={handleChangePassword}>
+                  Reset Password by Email
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {settingsView === 'theme' && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <button
+                  onClick={() => updateSettings({ theme: 'light' })}
+                  className={cn(
+                    "app-surface flex flex-col items-center gap-3 p-4 rounded-[28px] border-2 bg-background",
+                    settings.theme === 'light' ? "border-primary" : "border-border"
+                  )}
+                >
+                  <div className="h-16 w-full bg-slate-50 rounded-lg border relative">
+                    {settings.theme === 'light' && <Check className="h-4 w-4 absolute top-1 right-1 text-primary" />}
+                  </div>
+                  <span className="text-xs font-semibold">Light Mode</span>
+                </button>
+                <button
+                  onClick={() => updateSettings({ theme: 'dark' })}
+                  className={cn(
+                    "flex flex-col items-center gap-3 p-4 rounded-[28px] border bg-slate-900 shadow-xl shadow-primary/10",
+                    settings.theme === 'dark' ? "border-2 border-primary" : "border-border"
+                  )}
+                >
+                  <div className="h-16 w-full bg-slate-800 rounded-lg relative">
+                    {settings.theme === 'dark' && <Check className="h-4 w-4 absolute top-1 right-1 text-white" />}
+                  </div>
+                  <span className="text-xs font-semibold text-white">Dark Mode</span>
+                </button>
+              </div>
+              <div className="app-surface p-4 rounded-[28px]">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Follow System Theme</span>
+                  <Switch
+                    checked={settings.theme === 'system'}
+                    onCheckedChange={(checked) => updateSettings({ theme: checked ? 'system' : 'light' })}
+                  />
+                </div>
+              </div>
+
+              <div className="app-surface p-5 rounded-[28px] space-y-4">
+                <span className="text-sm font-semibold block">Brand Color</span>
+                <div className="flex items-center gap-4 flex-wrap">
+                  {(['blue', 'green', 'purple', 'orange', 'rose'] as const).map((color) => (
+                    <button
+                      key={color}
+                      onClick={() => updateSettings({ themeColor: color })}
+                      className={cn(
+                        "h-12 w-12 rounded-full flex items-center justify-center transition-all",
+                        settings.themeColor === color ? "ring-2 ring-offset-2 ring-primary scale-110" : "hover:scale-105 opacity-80 hover:opacity-100",
+                        color === 'blue' && "bg-blue-600",
+                        color === 'green' && "bg-green-600",
+                        color === 'purple' && "bg-purple-600",
+                        color === 'orange' && "bg-orange-600",
+                        color === 'rose' && "bg-rose-600"
+                      )}
+                    >
+                      {settings.themeColor === color && <Check className="h-6 w-6 text-white drop-shadow-md" />}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="app-surface p-5 rounded-[28px] space-y-6">
+                <div>
+                  <span className="text-sm font-semibold mb-3 block">Text Size</span>
+                  <div className="flex bg-primary/5 p-1 rounded-full items-center justify-between border border-primary/20">
+                    {(['small', 'medium', 'large'] as const).map(size => (
+                      <button
+                        key={size}
+                        onClick={() => updateSettings({ fontSize: size })}
+                        className={cn(
+                          "flex-1 text-xs font-semibold py-2.5 rounded-full capitalize transition-colors",
+                          settings.fontSize === size ? "bg-primary text-white shadow-md shadow-primary/20" : "text-muted-foreground hover:bg-primary/10"
+                        )}
+                      >
+                        {size}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <span className="text-sm font-semibold">Font Style</span>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(['system', 'inter', 'roboto', 'serif', 'mono'] as const).map(font => (
+                      <button
+                        key={font}
+                        onClick={() => updateSettings({ fontFamily: font })}
+                        className={cn(
+                          "text-xs font-medium py-3 px-3 rounded-xl border text-left capitalize transition-colors",
+                          settings.fontFamily === font ? "border-primary bg-primary/10 text-primary" : "border-border hover:bg-secondary/50 text-muted-foreground"
+                        )}
+                      >
+                        {font}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-border/50">
+                  <span className="text-sm font-semibold mb-4 block text-muted-foreground">Chat Preview</span>
+                  <div className="bg-secondary/30 p-4 rounded-[24px] space-y-4 border border-border/50 relative overflow-hidden">
+                    {/* Left message */}
+                    <div className="flex gap-2">
+                      <div className="bg-primary text-white p-3.5 rounded-2xl rounded-tl-sm text-[length:inherit] max-w-[85%] shadow-sm">
+                        Hey! How does this text look?
+                      </div>
+                    </div>
+                    {/* Right message */}
+                    <div className="flex gap-2 justify-end">
+                      <div className="app-surface border border-border/40 p-3.5 rounded-2xl rounded-tr-sm text-[length:inherit] max-w-[85%] shadow-sm">
+                        Looks perfect to me! The new font is super clear. 🚀
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {settingsView === 'developer' && (
+            <div className="space-y-6">
+              <div className="app-surface p-6 rounded-[32px] text-center space-y-4">
+                <div className="w-24 h-24 mx-auto rounded-[32px] overflow-hidden shadow-lg border border-accent/20">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src="https://0.gravatar.com/avatar/f93ab0553fdd50e05eca8505fc4ed8e78d6e4956d495dc45b169837cd2ed7987?s=256"
+                    alt="Saykot"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold font-headline">Saykot</h3>
+                  <p className="text-sm font-medium text-accent">Full-Stack Developer</p>
+                </div>
+                <div className="text-sm text-muted-foreground space-y-2 pb-2">
+                  <p>
+                    Hi! I'm Saykot, a passionate Full-Stack Developer based in Barisal, Bangladesh.
+                  </p>
+                  <p>
+                    I specialize in building modern, interactive, and scalable web applications using React, Next.js, Node.js, and other cutting-edge technologies. I love solving complex problems and creating seamless user experiences.
+                  </p>
+                </div>
+                <Button asChild className="w-full rounded-xl bg-gradient-to-r from-accent to-primary hover:opacity-90">
+                  <a href="https://saykot.vercel.app/" target="_blank" rel="noopener noreferrer">
+                    <Globe className="h-4 w-4 mr-2" /> View Portfolio
+                  </a>
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {settingsView === 'accountMode' && (
+            <div className="space-y-4">
+              <div className="app-surface p-4 rounded-[28px] space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="text-base font-semibold">Account Mode</Label>
+                    <p className="text-sm text-muted-foreground">
+                      {settings.accountMode === 'private'
+                        ? 'Private: Only friends can see your profile.'
+                        : 'Public: Everyone can see your profile.'}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={cn("text-xs font-medium px-2 py-1 rounded-full",
+                      (settings?.accountMode || 'public') === 'private' ? "bg-amber-100 text-amber-700" : "bg-green-100 text-green-700")}>
+                      {(settings?.accountMode || 'public').toUpperCase()}
+                    </span>
+                    <Switch
+                      checked={(settings?.accountMode || 'public') === 'private'}
+                      onCheckedChange={(checked) => updateSettings({ accountMode: checked ? 'private' : 'public' })}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {settingsView === 'privacy' && (
+            <div className="space-y-4">
+              <div className="app-surface prose prose-sm text-muted-foreground p-5 rounded-[28px] border border-border/40">
+                <h3 className="text-foreground font-semibold text-base mb-3">Privacy & Data Policy</h3>
+                <p className="mb-2">
+                  At <strong>My Messenger</strong>, your privacy is our highest priority. We are committed to protecting your personal information and ensuring a secure communication experience.
+                </p>
+                <ul className="list-disc pl-5 mb-3 space-y-1">
+                  <li><strong>End-to-End Security:</strong> Your messages and calls are processed securely. We employ industry-standard encryption to protect your data in transit and at rest.</li>
+                  <li><strong>Data Ownership:</strong> You retain full control over your personal data. Your profile information, contacts, and chat history are securely stored in your Firebase instance.</li>
+                  <li><strong>No Third-Party Tracking:</strong> We do not sell, rent, or share your personal data with third-party advertisers or data brokers under any circumstances.</li>
+                </ul>
+                <p>
+                  By using My Messenger, you consent to our data practices as outlined above. You can download a copy of your profile data at any time using the button below.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                className="w-full rounded-xl"
+                onClick={handleDownloadMyData}
+                disabled={isExportingData}
+              >
+                {isExportingData ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4 mr-2" />
+                )}
+                Download My Data
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 
@@ -1240,25 +1240,25 @@ export default function MessengerApp() {
                 <Image src={AppLogo} alt="App Logo" className="h-full w-full object-contain drop-shadow-md" priority />
               </button>
               <div className="flex w-full flex-col gap-3 mt-2">
-              {DESKTOP_NAV_ITEMS.map(({ id, label, icon: Icon }) => (
-                <button
-                  key={id}
-                  onClick={() => {
-                    setActiveTab(id);
-                    setSettingsView('main');
-                  }}
-                  className={cn(
-                    "flex w-full items-center justify-center rounded-[20px] p-3.5 transition-all",
-                    activeTab === id
-                      ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
-                      : "app-surface-muted app-card-hover text-muted-foreground hover:text-foreground"
-                  )}
-                  title={label}
-                  aria-label={label}
-                >
-                  <Icon className="h-6 w-6 shrink-0" />
-                </button>
-              ))}
+                {DESKTOP_NAV_ITEMS.map(({ id, label, icon: Icon }) => (
+                  <button
+                    key={id}
+                    onClick={() => {
+                      setActiveTab(id);
+                      setSettingsView('main');
+                    }}
+                    className={cn(
+                      "flex w-full items-center justify-center rounded-[20px] p-3.5 transition-all",
+                      activeTab === id
+                        ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
+                        : "app-surface-muted app-card-hover text-muted-foreground hover:text-foreground"
+                    )}
+                    title={label}
+                    aria-label={label}
+                  >
+                    <Icon className="h-6 w-6 shrink-0" />
+                  </button>
+                ))}
               </div>
             </div>
           </div>
@@ -1401,9 +1401,9 @@ export default function MessengerApp() {
                           </p>
                         </div>
                       </div>
-                      <Button 
-                        size="sm" 
-                        className="w-full sm:w-auto rounded-full bg-blue-500 hover:bg-blue-600 text-white font-semibold" 
+                      <Button
+                        size="sm"
+                        className="w-full sm:w-auto rounded-full bg-blue-500 hover:bg-blue-600 text-white font-semibold"
                         disabled={isPushRegistering}
                         onClick={async () => {
                           setIsPushRegistering(true);
@@ -1628,7 +1628,7 @@ export default function MessengerApp() {
                         {filteredDirectory.length} people
                       </Badge>
                     </div>
-                    
+
                     <div className="flex flex-col gap-2">
                       {filteredDirectory.length === 0 && (
                         <div className="app-surface-muted rounded-[30px] border-dashed p-8 text-center text-sm text-muted-foreground">
@@ -1658,9 +1658,9 @@ export default function MessengerApp() {
                                 </p>
                               </div>
                             </button>
-                            
+
                             <div className="flex items-center gap-2">
-                               {isFriend ? (
+                              {isFriend ? (
                                 <Button variant="secondary" size="sm" className="rounded-full" onClick={() => openConversation(person.uid)}>
                                   Message
                                 </Button>
@@ -1691,9 +1691,9 @@ export default function MessengerApp() {
                 <div className="space-y-3">
                   {callHistory.length > 0 && (
                     <div className="flex justify-end px-2 mb-2">
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         className="text-muted-foreground hover:text-destructive rounded-xl"
                         onClick={async () => {
                           if (user) {
@@ -1903,7 +1903,7 @@ export default function MessengerApp() {
             <DialogDescription>Update your personal information here.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-                  <div className="flex flex-col items-center gap-4">
+            <div className="flex flex-col items-center gap-4">
               <button
                 type="button"
                 onClick={handlePhotoSelection}
@@ -1963,74 +1963,74 @@ export default function MessengerApp() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-        <Dialog open={reauthOpen} onOpenChange={setReauthOpen}>
-          <DialogContent className="max-w-xs rounded-3xl">
-            <DialogHeader>
-              <DialogTitle>Re-authenticate</DialogTitle>
-              <DialogDescription>For security, please sign in again to delete your account.</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-2">
-              <div className="space-y-2">
-                <Label htmlFor="reauth-email">Email</Label>
-                <Input id="reauth-email" value={reauthEmail} onChange={(e) => setReauthEmail(e.target.value)} className="rounded-xl bg-muted/50 border-none" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="reauth-password">Password</Label>
-                <Input id="reauth-password" type="password" value={reauthPassword} onChange={(e) => setReauthPassword(e.target.value)} className="rounded-xl bg-muted/50 border-none" />
-              </div>
-              {reauthError && (
-                <p className="text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2">{reauthError}</p>
-              )}
+      <Dialog open={reauthOpen} onOpenChange={setReauthOpen}>
+        <DialogContent className="max-w-xs rounded-3xl">
+          <DialogHeader>
+            <DialogTitle>Re-authenticate</DialogTitle>
+            <DialogDescription>For security, please sign in again to delete your account.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="reauth-email">Email</Label>
+              <Input id="reauth-email" value={reauthEmail} onChange={(e) => setReauthEmail(e.target.value)} className="rounded-xl bg-muted/50 border-none" />
             </div>
-            <DialogFooter className="flex-row gap-2">
-              <Button variant="ghost" onClick={() => setReauthOpen(false)} className="flex-1 rounded-xl">Cancel</Button>
-              <Button
-                onClick={async () => {
-                  setReauthError(null);
-                  setReauthSubmitting(true);
-                  try {
-                    await login(reauthEmail, reauthPassword);
-                    await finishDeleteAccount();
-                    setReauthOpen(false);
-                    router.replace('/login');
-                  } catch (err: any) {
-                    console.error('Reauth failed', err);
-                    setReauthError(err?.code ? err.message : 'Reauthentication failed.');
-                  } finally {
-                    setReauthSubmitting(false);
-                  }
-                }}
-                className="flex-1 rounded-xl bg-accent hover:bg-accent/90"
-              >
-                Reauthenticate & Delete
-              </Button>
-            </DialogFooter>
-            <div className="px-6 pb-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={async () => {
-                  setReauthError(null);
-                  setReauthSubmitting(true);
-                  try {
-                    await loginWithGoogle();
-                    await finishDeleteAccount();
-                    setReauthOpen(false);
-                    router.replace('/login');
-                  } catch (err) {
-                    console.error('Google reauth failed', err);
-                    setReauthError('Reauthentication failed.');
-                  } finally {
-                    setReauthSubmitting(false);
-                  }
-                }}
-                className="w-full rounded-xl"
-              >
-                Continue with Google
-              </Button>
+            <div className="space-y-2">
+              <Label htmlFor="reauth-password">Password</Label>
+              <Input id="reauth-password" type="password" value={reauthPassword} onChange={(e) => setReauthPassword(e.target.value)} className="rounded-xl bg-muted/50 border-none" />
             </div>
-          </DialogContent>
-        </Dialog>
+            {reauthError && (
+              <p className="text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2">{reauthError}</p>
+            )}
+          </div>
+          <DialogFooter className="flex-row gap-2">
+            <Button variant="ghost" onClick={() => setReauthOpen(false)} className="flex-1 rounded-xl">Cancel</Button>
+            <Button
+              onClick={async () => {
+                setReauthError(null);
+                setReauthSubmitting(true);
+                try {
+                  await login(reauthEmail, reauthPassword);
+                  await finishDeleteAccount();
+                  setReauthOpen(false);
+                  router.replace('/login');
+                } catch (err: any) {
+                  console.error('Reauth failed', err);
+                  setReauthError(err?.code ? err.message : 'Reauthentication failed.');
+                } finally {
+                  setReauthSubmitting(false);
+                }
+              }}
+              className="flex-1 rounded-xl bg-accent hover:bg-accent/90"
+            >
+              Reauthenticate & Delete
+            </Button>
+          </DialogFooter>
+          <div className="px-6 pb-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={async () => {
+                setReauthError(null);
+                setReauthSubmitting(true);
+                try {
+                  await loginWithGoogle();
+                  await finishDeleteAccount();
+                  setReauthOpen(false);
+                  router.replace('/login');
+                } catch (err) {
+                  console.error('Google reauth failed', err);
+                  setReauthError('Reauthentication failed.');
+                } finally {
+                  setReauthSubmitting(false);
+                }
+              }}
+              className="w-full rounded-xl"
+            >
+              Continue with Google
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
       <Dialog open={isCreateGroupOpen} onOpenChange={setIsCreateGroupOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
@@ -2105,13 +2105,13 @@ export default function MessengerApp() {
           <div className="relative">
             {/* Header Background */}
             <div className="h-32 bg-gradient-to-br from-primary/20 via-accent/10 to-background/5" />
-            
+
             <div className="px-6 pb-6 -mt-12 relative">
               <Avatar className="h-24 w-24 ring-4 ring-background shadow-xl bg-muted mb-4">
                 <AvatarImage src={selectedUserDetails?.photoURL} />
                 <AvatarFallback className="text-xl">{selectedUserDetails?.name[0]}</AvatarFallback>
               </Avatar>
-              
+
               <div className="space-y-4 mb-6">
                 <div className="space-y-1">
                   <h2 className="text-2xl font-bold font-headline">{selectedUserDetails?.name}</h2>
@@ -2119,7 +2119,7 @@ export default function MessengerApp() {
                     <p className="text-sm text-muted-foreground">{selectedUserDetails.status}</p>
                   )}
                 </div>
-                
+
                 {user && selectedUserDetails && user.uid !== selectedUserDetails.uid && (
                   <div className="flex items-center gap-3">
                     {myFriends.includes(selectedUserDetails.uid) ? (
@@ -2181,7 +2181,7 @@ export default function MessengerApp() {
                         <p className="text-foreground/90">{selectedUserDetails.bio}</p>
                       </div>
                     )}
-                    
+
                     {(selectedUserDetails?.location || selectedUserDetails?.occupation) && (
                       <div className="grid grid-cols-2 gap-4">
                         {selectedUserDetails?.location && (

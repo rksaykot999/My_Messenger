@@ -67,6 +67,8 @@ export function useMessageNotifications(
         toast({
           title: other?.name || "New message",
           description: chat.lastMessage,
+          className: "cursor-pointer",
+          onClick: () => onOpenChat(chat.id),
         });
       } else {
         showMessageNotification({
