@@ -717,6 +717,7 @@ export default function MessengerApp() {
           email: selectedPerson.email,
           lastSeen: selectedPerson.lastSeen,
           quickEmoji: chats.find(c => c.id === activeChatId)?.quickEmoji,
+          nickname: chats.find(c => c.id === activeChatId)?.nicknames?.[selectedPerson.uid]
         }}
         isBlocked={blockedUsers.includes(selectedPerson.uid)}
         amIBlocked={selectedPerson.blockedUsers?.includes(user?.uid as string)}
@@ -740,6 +741,7 @@ export default function MessengerApp() {
           { id: selectedPerson.uid, name: selectedPerson.name, avatar: selectedPerson.photoURL },
           type
         )}
+        onAddFriend={() => handleSendFriendRequest(selectedPerson.uid)}
       />
     );
   } else if (selectedGroupChat && isMobile) {
@@ -1218,8 +1220,8 @@ export default function MessengerApp() {
   );
 
   return (
-    <div className="app-shell min-h-screen lg:h-screen lg:overflow-hidden">
-      <div className="flex min-h-screen w-full lg:h-screen">
+    <div className="app-shell fixed inset-0 flex flex-col h-[100dvh] w-full overflow-hidden lg:relative lg:h-screen lg:block">
+      <div className="flex h-full w-full">
         <aside className="hidden lg:flex lg:h-screen lg:w-[92px] shrink-0 lg:flex-col lg:items-center lg:justify-between lg:px-3 lg:py-5">
           <div className="flex w-full flex-col items-center gap-4">
             <div className="app-sidebar flex w-full flex-col items-center gap-4 rounded-[32px] px-2 py-5">
@@ -1277,7 +1279,7 @@ export default function MessengerApp() {
           </div>
         </aside>
 
-        <div className="app-grid-lines flex min-h-screen flex-1 flex-col overflow-hidden lg:h-screen lg:min-h-0 lg:flex-row lg:gap-4 lg:p-4 lg:pl-0">
+        <div className="app-grid-lines flex h-full flex-1 flex-col overflow-hidden lg:flex-row lg:gap-4 lg:p-4 lg:pl-0">
           <section
             className={cn(
               "flex min-h-0 flex-1 flex-col lg:rounded-[34px] lg:border lg:border-border/70 lg:bg-background/66 lg:shadow-[0_24px_60px_rgba(0,0,0,0.25)] lg:backdrop-blur-2xl",
@@ -1767,6 +1769,7 @@ export default function MessengerApp() {
                     email: selectedPerson.email,
                     lastSeen: selectedPerson.lastSeen,
                     quickEmoji: chats.find(c => c.id === activeChatId)?.quickEmoji,
+                    nickname: chats.find(c => c.id === activeChatId)?.nicknames?.[selectedPerson.uid]
                   }}
                   isBlocked={blockedUsers.includes(selectedPerson.uid)}
                   amIBlocked={selectedPerson.blockedUsers?.includes(user?.uid as string)}

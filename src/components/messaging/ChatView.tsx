@@ -697,8 +697,13 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, on
 
   const handleSaveNickname = async () => {
     if (!chatId || !user) return;
+    let id = chatId;
+    if (!id) {
+       id = await ensureChat(user.uid, chat.id);
+       setChatId(id);
+    }
     try {
-      await setNickname(chatId, chat.id, newNickname);
+      await setNickname(id, chat.id, newNickname);
       setEditNicknameOpen(false);
       toast({ title: "Nickname updated" });
     } catch (e) {
@@ -790,6 +795,15 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, on
                     />
                   </PopoverContent>
                 </Popover>
+                {!chat.isGroup && (
+                  <button
+                    onClick={() => { setInfoOpen(false); setNewNickname(chat.nickname || chat.name); setEditNicknameOpen(true); }}
+                    className="w-full flex items-center gap-3 p-3.5 rounded-2xl border border-border/50 hover:bg-muted/50 text-left transition-colors group"
+                  >
+                    <div className="bg-muted p-2 rounded-xl group-hover:bg-primary/10 transition-colors"><Edit3 className="h-4 w-4 text-primary" /></div>
+                    <span className="text-sm font-semibold text-primary">Change Nickname</span>
+                  </button>
+                )}
                 {!chat.isGroup ? (
                   <button
                     onClick={() => { setInfoOpen(false); setConfirmDelete(true); }}
@@ -817,7 +831,7 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, on
                 )}
                 {!chat.isGroup && (
                   <>
-                    {isFriend && (
+                    {isFriend ? (
                       <button
                         onClick={() => { setInfoOpen(false); setConfirmUnfriend(true); }}
                         className="w-full flex items-center gap-3 p-3.5 rounded-2xl hover:bg-destructive/10 text-left transition-colors group"
@@ -826,6 +840,16 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, on
                           <UserMinus className="h-4 w-4 text-destructive" />
                         </div>
                         <span className="text-sm font-semibold text-destructive">Unfriend</span>
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => { setInfoOpen(false); onAddFriend?.(); }}
+                        className="w-full flex items-center gap-3 p-3.5 rounded-2xl hover:bg-primary/10 text-left transition-colors group"
+                      >
+                        <div className="bg-primary/10 group-hover:bg-primary/20 p-2 rounded-xl transition-colors">
+                          <Plus className="h-4 w-4 text-primary" />
+                        </div>
+                        <span className="text-sm font-semibold text-primary">Add Friend</span>
                       </button>
                     )}
                     <button
@@ -1439,27 +1463,6 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, on
               <div>
                 <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2 px-2">Quick Actions</h4>
                 <div className="bg-muted/10 border border-border/40 rounded-[24px] p-2 space-y-1">
-                  {!chat.isGroup && (
-                    <>
-                      {isFriend ? (
-                        <button onClick={() => { setContactInfoOpen(false); setConfirmUnfriend(true); }} className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-destructive/10 transition-colors">
-                          <div className="flex items-center gap-3 text-destructive">
-                            <UserMinus className="h-5 w-5" />
-                            <span className="text-sm font-medium text-destructive">Unfriend</span>
-                          </div>
-                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                        </button>
-                      ) : (
-                        <button onClick={() => { setContactInfoOpen(false); onAddFriend?.(); }} className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-primary/10 transition-colors">
-                          <div className="flex items-center gap-3 text-primary">
-                            <Plus className="h-5 w-5" />
-                            <span className="text-sm font-medium text-primary">Add Friend</span>
-                          </div>
-                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                        </button>
-                      )}
-                    </>
-                  )}
                   <button onClick={() => setContactInfoOpen(false)} className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-muted/20 transition-colors">
                     <div className="flex items-center gap-3 text-primary">
                       <MessageSquare className="h-5 w-5" />
@@ -1487,15 +1490,6 @@ export function ChatView({ chat, onBack, onCall, onLeaveGroup, onDeleteGroup, on
                       />
                     </PopoverContent>
                   </Popover>
-                  {!chat.isGroup && (
-                    <button onClick={() => { setContactInfoOpen(false); setNewNickname(chat.nickname || chat.name); setEditNicknameOpen(true); }} className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-muted/20 transition-colors">
-                      <div className="flex items-center gap-3 text-primary">
-                        <Edit3 className="h-5 w-5" />
-                        <span className="text-sm font-medium">Change Nickname</span>
-                      </div>
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                    </button>
-                  )}
                   {!chat.isGroup ? (
                     <button onClick={() => { setContactInfoOpen(false); setConfirmDelete(true); }} className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-destructive/10 transition-colors">
                       <div className="flex items-center gap-3 text-destructive">
