@@ -17,6 +17,7 @@ import {
   arrayRemove,
   writeBatch,
   deleteField,
+  limit,
 } from "firebase/firestore";
 import { db, storage } from "@/lib/firebase";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
@@ -350,12 +351,36 @@ export async function editMessage(
     edited: true,
   });
   
-  // Update lastMessage if this was the latest message
-  // (In a real app, you'd check if it's the last message before updating)
-  const chatRef = doc(db, "chats", chatId);
-  const snap = await getDoc(chatRef);
-  if (snap.exists() && (snap.data() as any).lastMessage) {
-    // Just a basic heuristic or you can omit updating the chat list preview
+  await updateChatLastMessage(chatId);
+}
+
+async function updateChatLastMessage(chatId: string) {
+  try {
+    const msgsQuery = query(collection(db, "chats", chatId, "messages"), orderBy("createdAt", "desc"), limit(1));
+    const msgsSnap = await getDocs(msgsQuery);
+    if (!msgsSnap.empty) {
+      const latest = msgsSnap.docs[0];
+      const data = latest.data();
+      let lastMsgText = data.text || "";
+      if (data.deleted) lastMsgText = "This message was deleted";
+      else if (data.type === "image") lastMsgText = "📷 Photo";
+      else if (data.type === "video") lastMsgText = "🎥 Video";
+      else if (data.type === "audio") lastMsgText = "🎵 Voice message";
+      else if (data.type === "file") lastMsgText = "📄 File";
+      else if (data.type === "call") lastMsgText = "📞 Call";
+      
+      await updateDoc(doc(db, "chats", chatId), {
+        lastMessage: lastMsgText,
+        lastSenderId: data.senderId,
+      });
+    } else {
+      await updateDoc(doc(db, "chats", chatId), {
+        lastMessage: "",
+        lastMessageAt: serverTimestamp()
+      });
+    }
+  } catch (err) {
+    console.error("Failed to update chat last message", err);
   }
 }
 
@@ -395,6 +420,7 @@ export async function deleteMessageForEveryone(chatId: string, messageId: string
     reactions: deleteField(),
     replyTo: deleteField(),
   });
+  await updateChatLastMessage(chatId);
 }
 
 /** Deletes a message for a specific user (hides it from their view only). */

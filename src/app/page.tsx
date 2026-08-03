@@ -305,7 +305,7 @@ export default function MessengerApp() {
       .filter(Boolean) as Array<{
         chatId: string; otherUid?: string; isGroup?: boolean; name: string; avatar: string;
         online: boolean; lastMessage: string; lastSenderId?: string; time: string; unread: number;
-        participants?: string[]; quickEmoji?: string;
+        participants?: string[]; quickEmoji?: string; nickname?: string;
       }>;
   }, [chats, directoryMap, myFriends, user]);
 
@@ -1507,7 +1507,7 @@ export default function MessengerApp() {
                           </div>
                           <div className="min-w-0 flex-1">
                             <div className="mb-0.5 flex items-center justify-between gap-3">
-                              <h3 className="truncate text-[15px] font-semibold">{chat.name}</h3>
+                              <h3 className="truncate text-[15px] font-semibold">{chat.nickname || chat.name}</h3>
                               <span className={cn("shrink-0 text-xs", chat.unread > 0 ? "font-semibold text-primary" : "font-medium text-muted-foreground")}>{chat.time}</span>
                             </div>
                             <div className="flex items-center justify-between gap-3">
