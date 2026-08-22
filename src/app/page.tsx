@@ -1636,7 +1636,7 @@ export default function MessengerApp() {
                           const isFriend = myFriends.includes(person.uid);
                           return (
                             <div key={person.uid} className="group flex flex-col items-center gap-2 min-w-[80px]">
-                              <button onClick={() => isFriend ? openConversation(person.uid) : null} className="relative">
+                              <button onClick={() => openConversation(person.uid)} className="relative">
                                 <Avatar className="h-16 w-16 ring-2 ring-transparent transition-all group-hover:ring-primary/40">
                                   <AvatarImage src={person.photoURL} />
                                   <AvatarFallback>{person.name[0]}</AvatarFallback>
@@ -1676,7 +1676,7 @@ export default function MessengerApp() {
                         const hasIncoming = incomingRequests.includes(person.uid);
                         return (
                           <div key={person.uid} className="app-card-hover flex items-center justify-between gap-4 rounded-[24px] p-3 hover:bg-muted/50 transition-colors">
-                            <button onClick={() => setSelectedUserDetails(person)} className="flex min-w-0 items-center gap-3 text-left hover:opacity-80 transition-opacity">
+                            <button onClick={() => openConversation(person.uid)} className="flex min-w-0 items-center gap-3 text-left hover:opacity-80 transition-opacity">
                               <div className="relative">
                                 <Avatar className="h-12 w-12">
                                   <AvatarImage src={person.photoURL} />
