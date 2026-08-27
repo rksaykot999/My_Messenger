@@ -59,7 +59,7 @@ export function CallOverlay({
     if (localVideoRef.current && localStream) {
       localVideoRef.current.srcObject = localStream;
     }
-  }, [localStream]);
+  }, [localStream, isVideoOn]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -77,23 +77,7 @@ export function CallOverlay({
     }
   }, [isSpeaker, remoteStream]);
 
-  const [hasRemoteVideo, setHasRemoteVideo] = useState(
-    () => type === 'video' && !!(remoteStream && remoteStream.getVideoTracks().length > 0)
-  );
-
-  useEffect(() => {
-    if (!remoteStream) return;
-    const checkVideo = () => {
-      setHasRemoteVideo(type === 'video' && remoteStream.getVideoTracks().length > 0);
-    };
-    checkVideo();
-    remoteStream.addEventListener('addtrack', checkVideo);
-    remoteStream.addEventListener('removetrack', checkVideo);
-    return () => {
-      remoteStream.removeEventListener('addtrack', checkVideo);
-      remoteStream.removeEventListener('removetrack', checkVideo);
-    };
-  }, [remoteStream, type]);
+  const hasRemoteVideo = type === 'video' && !!(remoteStream && remoteStream.getVideoTracks().length > 0);
 
   useEffect(() => {
     if (remoteVideoRef.current && remoteStream) {

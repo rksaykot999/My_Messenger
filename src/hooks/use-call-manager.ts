@@ -95,6 +95,12 @@ export function useCallManager() {
     async (callee: { id: string; name: string; avatar: string }, type: CallType) => {
       if (!user || !profile) return;
       const session = new CallSession();
+      session.onRemoteTrack = () => {
+        if (!session.remoteStream) return;
+        const newStream = new MediaStream(session.remoteStream.getTracks());
+        session.remoteStream = newStream;
+        setActiveCall((prev) => prev ? { ...prev, remoteStream: newStream } : prev);
+      };
       sessionRef.current = session;
       setActiveCall({
         callId: "",
@@ -134,6 +140,12 @@ export function useCallManager() {
     const call = incomingCall;
     setIncomingCall(null);
     const session = new CallSession(call.id);
+    session.onRemoteTrack = () => {
+      if (!session.remoteStream) return;
+      const newStream = new MediaStream(session.remoteStream.getTracks());
+      session.remoteStream = newStream;
+      setActiveCall((prev) => prev ? { ...prev, remoteStream: newStream } : prev);
+    };
     sessionRef.current = session;
     setActiveCall({
       callId: call.id,

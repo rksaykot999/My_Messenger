@@ -19,6 +19,15 @@ const ICE_SERVERS = {
   iceServers: [
     { urls: "stun:stun.l.google.com:19302" },
     { urls: "stun:stun1.l.google.com:19302" },
+    { urls: "stun:stun2.l.google.com:19302" },
+    // TODO: For production environments, it is recommended to use a dedicated TURN server
+    // to ensure reliable connectivity across strict NATs and firewalls.
+    // Example TURN configuration:
+    // {
+    //   urls: "turn:your-turn-server.com:3478",
+    //   username: "your-username",
+    //   credential: "your-password",
+    // },
     {
       urls: "turn:openrelay.metered.ca:80",
       username: "openrelayproject",
@@ -65,6 +74,7 @@ export class CallSession {
   localStream: MediaStream | null = null;
   remoteStream: MediaStream;
   private unsubs: Array<() => void> = [];
+  onRemoteTrack?: () => void;
 
   constructor(callId?: string) {
     this.pc = new RTCPeerConnection(ICE_SERVERS);
@@ -73,6 +83,7 @@ export class CallSession {
 
     this.pc.ontrack = (event) => {
       this.remoteStream.addTrack(event.track);
+      this.onRemoteTrack?.();
     };
   }
 
