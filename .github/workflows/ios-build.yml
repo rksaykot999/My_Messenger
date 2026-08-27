@@ -19,7 +19,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20' # Adjust based on your project requirements
+          node-version: '22' # Capacitor CLI requires Node >= 22
 
       - name: Install Dependencies
         run: npm install
