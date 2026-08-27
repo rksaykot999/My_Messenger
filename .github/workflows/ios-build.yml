@@ -1,0 +1,56 @@
+name: Build iOS App
+
+on:
+  workflow_dispatch: # Allows manual trigger from the Actions tab
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - 'README.md'
+
+jobs:
+  build-ios:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20' # Adjust based on your project requirements
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Build Web App
+        run: npm run build
+
+      - name: Sync Capacitor for iOS
+        run: npx cap sync ios
+
+      - name: Install CocoaPods Dependencies
+        run: |
+          cd ios/App
+          pod install
+
+      - name: Build iOS App (Unsigned)
+        run: |
+          cd ios/App
+          # We build an unsigned payload so you can sideload it using AltStore or Sideloadly
+          xcodebuild -workspace App.xcworkspace -scheme App -configuration Release -sdk iphoneos CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO clean build CONFIGURATION_BUILD_DIR=$(pwd)/build
+
+      - name: Package IPA
+        run: |
+          cd ios/App/build
+          mkdir Payload
+          mv App.app Payload/
+          zip -r MyMessenger.ipa Payload
+
+      - name: Upload iOS IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MyMessenger-iOS
+          path: ios/App/build/MyMessenger.ipa
+          retention-days: 7
