@@ -939,7 +939,7 @@ export default function MessengerApp() {
 
             <div className="mt-8 pb-4 text-center">
               <p className="text-xs font-medium text-muted-foreground/50 uppercase tracking-widest">Version</p>
-              <p className="text-sm font-semibold text-muted-foreground/70">My Messenger v1.0</p>
+              <p className="text-sm font-semibold text-muted-foreground/70">My Messenger v2.0.0</p>
             </div>
           </div>
         </>

@@ -37,8 +37,8 @@ Use a clear and standardized title for every release so users can easily identif
 
 **Format:** `My Messenger <Version_Tag>`
 **Examples:**
-*   `My Messenger v1.0.0`
-*   `My Messenger v1.2.1-beta`
+*   `My Messenger v2.0.0`
+*   `My Messenger v2.0.1-beta`
 
 ---
 
