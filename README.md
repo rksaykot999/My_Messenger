@@ -1,124 +1,84 @@
-# App build command for web and app: 
-npm run build && npx cap sync android
-npx cap open android
+<div align="center">
+  <img src="https://img.icons8.com/color/96/000000/chat--v1.png" alt="Logo" width="80" height="80">
+  <h1 align="center">My Messenger</h1>
 
-# My Messenger
+  <p align="center">
+    A next-generation, real-time messaging and communication platform built for the modern web and mobile ecosystems.
+    <br />
+    <br />
+    <a href="https://my-messenger-web.vercel.app/"><strong>Explore the Live App »</strong></a>
+    <br />
+    <br />
+  </p>
+</div>
 
-A real-time messaging app (Next.js + Firebase) — login/signup, live chat,
-friend requests, voice/video calling, and browser notifications.
+---
 
+## 🌐 Overview
 
-## Bugs found and fixed in this update
+**[My Messenger](https://my-messenger-web.vercel.app/)** is a fully-featured, cross-platform communication application designed to connect people seamlessly. Whether you are on a desktop browser, an Android phone, or an iOS device, My Messenger provides a unified, fast, and secure real-time chatting and calling experience.
 
-1. **Messaging didn't work at all** — `firestore.rules` had `allow read,
-   update, delete` for the `chats` collection but no `allow create`. Every
-   time two people tried to start a new conversation, Firestore silently
-   rejected the chat-creation write (permission-denied), so the chat view
-   never loaded and nothing could be sent. Fixed by adding the missing
-   `create` rule.
+Built with cutting-edge web technologies, it bridges the gap between traditional web applications and native mobile apps, offering a lightning-fast UI, real-time database synchronization, and high-quality peer-to-peer media streaming.
 
-2. **Friend requests appeared to send/accept but didn't stick** —
-   `AuthContext`'s sign-in listener was resetting `friends`,
-   `incomingRequests`, and `outgoingRequests` back to empty arrays *every
-   time the app loaded* (including simple page refreshes), because it
-   `setDoc(..., { merge: true })`'d those fields on every auth-state change.
-   `merge: true` only protects fields you don't mention — these were
-   explicitly included, so they got overwritten. Fixed so those fields are
-   only ever initialized once, on first sign-in.
+---
 
-3. **Calling appeared broken** — this was a knock-on effect of bug #1:
-   calls are started from inside a chat, and chats couldn't be created, so
-   there was never a way to reach the call button in practice. The WebRTC
-   calling code itself was already correct and works once you can get into
-   a chat.
+## ✨ Key Features
 
-4. **Notifications appeared broken** — also a knock-on effect of bug #1: no
-   messages were ever successfully written, so there was nothing to notify
-   about.
+### 💬 Real-Time Messaging
+*   **Instant Message Delivery:** Powered by Firebase Firestore, messages are delivered and synced across all devices with zero latency.
+*   **Read Receipts & Typing Indicators:** Know exactly when your friends are online, typing, or have read your messages.
 
-5. **Profile photo upload had no Storage rules** — added `storage.rules` so
-   a signed-in user can upload/replace only their own profile photo
-   (`profilePhotos/{their-uid}/...`), and anyone signed in can view photos.
+### 📞 High-Quality Voice & Video Calls
+*   **WebRTC Integration:** Make crystal-clear, peer-to-peer voice and video calls directly from your browser or mobile app.
+*   **Seamless Call UI:** A beautifully crafted calling interface with options to mute, disable video, and switch cameras.
 
-6. Removed a hardcoded fallback Firebase API key that had been placed
-   directly in `src/lib/firebase.ts` as a workaround for an earlier
-   "api-key-not-valid" error. That error was actually caused by `.env.local`
-   not being loaded yet (fixed by properly setting `.env.local` + restarting
-   the dev server) — hardcoding real project credentials into source code
-   isn't good practice, so it's been reverted to a safe placeholder fallback
-   now that env loading is confirmed working.
+### 👥 Social Connectivity
+*   **Friend System:** Easily search for users, send friend requests, and manage your contacts.
+*   **Profile Customization:** Personalize your account with custom profile photos (securely stored via Firebase Storage) and display names.
 
-7. Cleaned up the now-unused Genkit "Chat with AI" source files
-   (`src/ai/`, `AIChatView.tsx`) that were dead code left over from an
-   earlier version.
+### 🔐 Secure Authentication
+*   **Multi-Provider Login:** Securely sign up or log in using Email & Password or Google Sign-In.
+*   **Protected Data:** Strict backend security rules ensure that your personal conversations and profile data remain completely private.
 
-8. Added error handling (toasts) to friend-request actions, chat setup, and
-   profile saving, so future failures show a message instead of failing
-   silently in the console — this will make debugging much faster next time.
+### 📱 Cross-Platform Experience (Web, Android & iOS)
+*   **Responsive Web App:** A gorgeous, app-like web interface optimized for all screen sizes.
+*   **Native Mobile Apps:** Packaged with Capacitor to provide native Android (APK) and iOS (IPA) applications with push notification capabilities.
+*   **Dark Mode Support:** A sleek and modern dark UI theme that is easy on the eyes.
 
-## 1. Create/confirm your Firebase project
+---
 
-1. <https://console.firebase.google.com/> → your project (or **Add
-   project**, free Spark plan).
-2. **Build → Authentication → Sign-in method** → **Email/Password** enabled
-   (and **Google**, if you want the Google sign-in button to work).
-3. **Build → Firestore Database** → created, production mode.
-4. **Build → Storage** → created (needed for profile photos).
-5. **Project settings → General → Your apps** → copy the `firebaseConfig`
-   values into `.env.local` (see below).
-6. Deploy `firestore.rules` and `storage.rules` (see the critical step
-   above) — **do this every time you change either file**.
+## 🛠️ Tech Stack
 
-## 2. Environment variables
+This project is built using a modern, scalable, and highly performant technology stack:
 
-```bash
-cp .env.local.example .env.local
-```
+### Frontend
+*   **[Next.js 15](https://nextjs.org/):** React framework for production-grade web applications.
+*   **[Tailwind CSS](https://tailwindcss.com/):** Utility-first CSS framework for rapid UI development.
+*   **[Radix UI](https://www.radix-ui.com/):** Unstyled, accessible components for building high-quality design systems.
+*   **[React Hook Form](https://react-hook-form.com/) & [Zod](https://zod.dev/):** Robust form validation and state management.
 
-Fill in the six `NEXT_PUBLIC_FIREBASE_*` values, no quotes needed:
+### Backend & Infrastructure
+*   **[Firebase Firestore](https://firebase.google.com/docs/firestore):** NoSQL cloud database for real-time data syncing.
+*   **[Firebase Authentication](https://firebase.google.com/docs/auth):** Secure and easy-to-use user authentication.
+*   **[Firebase Storage](https://firebase.google.com/docs/storage):** Robust file storage for user profile pictures and media.
+*   **[WebRTC](https://webrtc.org/):** Open-source project for real-time voice and video communication.
 
-```
-NEXT_PUBLIC_FIREBASE_API_KEY=AIzaSy...
-NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
-NEXT_PUBLIC_FIREBASE_PROJECT_ID=your-project
-NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your-project.firebasestorage.app
-NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=123456789012
-NEXT_PUBLIC_FIREBASE_APP_ID=1:123456789012:web:abc123
-```
+### Mobile & Build Tools
+*   **[Capacitor (v8)](https://capacitorjs.com/):** Cross-platform native runtime for building web apps that run natively on iOS and Android.
+*   **GitHub Actions:** Automated CI/CD pipelines for building Android APKs and iOS IPAs on every push.
 
-**After editing `.env.local`, always fully restart `npm run dev`** — Next.js
-only reads env files at server startup, not on hot-reload.
+---
 
-## 3. Run it
+## 🔗 Live Application
 
-```bash
-npm install
-npm run dev
-```
+Experience the application live on the web:
 
-Test with two accounts (a normal window + an incognito window): sign up as
-both, send a friend request from one, accept it from the other, then chat
-and call between them.
+👉 **[Launch My Messenger Web App](https://my-messenger-web.vercel.app/)**
 
-## Notes & limitations
+*(For mobile users, you can also download the Android APK from the [Releases](../../releases) section of this repository.)*
 
-- **Calling** uses public Google STUN servers only. For reliable calling
-  across arbitrary networks in production, add a TURN server to the
-  `iceServers` list in `src/lib/webrtc.ts`.
-- **Notifications** use the browser's Notification API and fire while the
-  tab is open in the background (not when the browser is fully closed). For
-  true closed-app push notifications, add Firebase Cloud Messaging (FCM)
-  with a service worker.
-- Grant notification + camera/microphone permission when your browser
-  prompts for them, or those features will silently no-op.
+---
 
-## Where things live
-
-- `src/app/page.tsx` — main app shell (chats, people/friends, calls, settings)
-- `src/lib/chat.ts` — Firestore chat + friend-request helpers
-- `src/lib/webrtc.ts` — WebRTC calling logic
-- `src/contexts/AuthContext.tsx` — auth state, sign up/in/out, account deletion
-- `src/hooks/use-call-manager.ts` — call state management
-- `src/hooks/use-message-notifications.ts` — notification logic
-- `firestore.rules` / `storage.rules` — server-side security rules (must be
-  deployed to Firebase, not just present in this repo)
+<div align="center">
+  <i>Crafted with ❤️ for seamless communication.</i>
+</div>
