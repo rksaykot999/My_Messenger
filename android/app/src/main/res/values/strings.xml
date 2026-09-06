@@ -4,4 +4,5 @@
     <string name="title_activity_main">My Messenger</string>
     <string name="package_name">com.mymessenger.app</string>
     <string name="custom_url_scheme">com.mymessenger.app</string>
+    <string name="server_client_id">1038574226468-okpbrd9mbo9sl5bh6icsvf2344dpb2sf.apps.googleusercontent.com</string>
 </resources>
