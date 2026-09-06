@@ -38,7 +38,7 @@ Use a clear and standardized title for every release so users can easily identif
 **Format:** `My Messenger <Version_Tag>`
 **Examples:**
 *   `My Messenger v2.0.0`
-*   `My Messenger v2.0.1-beta`
+*   `My Messenger v2.0.0-beta`
 
 ---
 
@@ -46,8 +46,8 @@ Use a clear and standardized title for every release so users can easily identif
 
 To keep the release attachments clean and professional, rename your build files before uploading them to GitHub:
 
-*   **Android:** `MyMessenger-v<version>.apk` (e.g., `MyMessenger-v1.0.0.apk`)
-*   **iOS:** `MyMessenger-v<version>.ipa` (e.g., `MyMessenger-v1.0.0.ipa`)
+*   **Android:** `MyMessenger-v2.0.0.apk`
+*   **iOS:** `MyMessenger-v2.0.0.ipa`
 
 *(Your GitHub Actions workflows currently output files like `app-debug.apk` and `MyMessenger.ipa`. Please rename them locally before uploading to a manual release.)*
 
@@ -55,25 +55,25 @@ To keep the release attachments clean and professional, rename your build files 
 
 ## 5. All-in-One Copy-Paste Template
 
-When creating a release, just copy the corresponding texts below and paste them into GitHub's fields. Replace the `[X.X.X]` with your actual version number (e.g., `1.0.0`).
+When creating a release, just copy the corresponding texts below and paste them into GitHub's fields. Replace the `[2.0.0]` with your actual version number (e.g., `1.0.0`).
 
-### 📌 Tag Name:
+### Tag Name:
 ```text
-v[X.X.X]
+v[2.0.0]
 ```
 
-### 🏷️ Release Title:
+### Release Title:
 ```text
-My Messenger v[X.X.X]
+My Messenger v2.0.0
 ```
 
-### 📦 Files to Upload (Rename them to this):
+### Files to Upload (Rename them to this):
 ```text
-MyMessenger-v[X.X.X].apk
-MyMessenger-v[X.X.X].ipa
+MyMessenger-v2.0.0.apk
+MyMessenger-v2.0.0.ipa
 ```
 
-### 📝 Release Description:
+### Release Description:
 *(Copy everything inside the block below and paste it into the "Describe this release" box)*
 
 ```markdown
@@ -81,13 +81,13 @@ MyMessenger-v[X.X.X].ipa
 - [Feature 1 description, e.g., Added support for Push Notifications]
 - [Feature 2 description, e.g., Introduced Dark Mode theme]
 
-## Bug Fixes 🐛
+## Bug Fixes 
 - [Bug 1, e.g., Fixed an issue where the app crashed on the login screen]
 - [Bug 2, e.g., Resolved UI glitches on smaller screens]
 
-## Downloads ⬇️
+## Downloads ⬇
 Please download the appropriate file for your device from the **Assets** section below:
 
-*   🤖 **Android:** Download `MyMessenger-v[X.X.X].apk` and install it directly on your device. *(Note: You may need to allow "Install from unknown sources" in your settings).*
-*   🍏 **iOS:** Download `MyMessenger-v[X.X.X].ipa`. Since this is an unsigned IPA, you will need to sideload it using tools like **AltStore**, **Sideloadly**, or **TrollStore**.
+* **Android:** Download `MyMessenger-v2.0.0.apk` and install it directly on your device. *(Note: You may need to allow "Install from unknown sources" in your settings).*
+* **iOS:** Download `MyMessenger-v2.0.0.ipa`. Since this is an unsigned IPA, you will need to sideload it using tools like **AltStore**, **Sideloadly**, or **TrollStore**.
 ```
