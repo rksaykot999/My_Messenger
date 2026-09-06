@@ -142,7 +142,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     GoogleAuth.initialize({
       clientId: "1038574226468-okpbrd9mbo9sl5bh6icsvf2344dpb2sf.apps.googleusercontent.com",
       scopes: ["profile", "email"],
-      grantOfflineAccess: true,
+      grantOfflineAccess: false,
     });
 
     let unsubProfile: (() => void) | undefined;
