@@ -1,5 +1,5 @@
 include ':app'
-include ':capacitor-cordova-android-plugins'
-project(':capacitor-cordova-android-plugins').projectDir = new File('./capacitor-cordova-android-plugins/')
+include ':capawesome-capacitor-google-sign-in'
+project(':capawesome-capacitor-google-sign-in').projectDir = new File('../node_modules/@capawesome/capacitor-google-sign-in/android')
 
 apply from: 'capacitor.settings.gradle'

@@ -22,7 +22,7 @@ import {
   signInWithCredential,
 } from "firebase/auth";
 import { Capacitor } from "@capacitor/core";
-import { GoogleAuth } from "@codetrix-studio/capacitor-google-auth";
+import { GoogleSignIn } from "@capawesome/capacitor-google-sign-in";
 import { PushNotifications } from "@capacitor/push-notifications";
 import {
   arrayRemove,
@@ -139,10 +139,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    GoogleAuth.initialize({
+    GoogleSignIn.initialize({
       clientId: "1038574226468-okpbrd9mbo9sl5bh6icsvf2344dpb2sf.apps.googleusercontent.com",
       scopes: ["profile", "email"],
-      grantOfflineAccess: false,
     });
 
     let unsubProfile: (() => void) | undefined;
@@ -302,8 +301,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginWithGoogle = async () => {
     if (Capacitor.isNativePlatform()) {
       try {
-        const googleUser = await GoogleAuth.signIn();
-        const idToken = googleUser.authentication.idToken;
+        const googleUser = await GoogleSignIn.signIn();
+        const idToken = googleUser.idToken;
         const credential = GoogleAuthProvider.credential(idToken);
         await signInWithCredential(auth, credential);
       } catch (error: any) {

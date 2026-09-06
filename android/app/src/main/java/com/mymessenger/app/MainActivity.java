@@ -9,6 +9,7 @@ import android.os.Bundle;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import com.getcapacitor.BridgeActivity;
+import io.capawesome.capacitorjs.plugins.googlesignin.GoogleSignInPlugin;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -17,6 +18,7 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         registerPlugin(AudioRouterPlugin.class);
+        registerPlugin(GoogleSignInPlugin.class);
         createNotificationChannel();
         requestNecessaryPermissions();
     }
