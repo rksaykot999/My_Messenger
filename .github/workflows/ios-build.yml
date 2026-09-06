@@ -22,7 +22,7 @@ jobs:
           node-version: '22' # Capacitor CLI requires Node >= 22
 
       - name: Install Dependencies
-        run: npm install
+        run: npm install --legacy-peer-deps
 
       - name: Build Web App
         run: npm run build

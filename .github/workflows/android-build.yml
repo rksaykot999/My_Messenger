@@ -50,7 +50,7 @@ jobs:
           cp android/app/debug.keystore ~/.android/debug.keystore
 
       - name: Install Dependencies
-        run: npm install
+        run: npm install --legacy-peer-deps
 
       - name: Build Web App
         run: npm run build
