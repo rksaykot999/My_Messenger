@@ -18,15 +18,7 @@
           "client_type": 1,
           "android_info": {
             "package_name": "com.mymessenger.app",
-            "certificate_hash": "78e4c41bfc73eb9c66ec17fbea8bdd95997bc37b"
-          }
-        },
-        {
-          "client_id": "1038574226468-p4jqq470icfuudhcmuisttp2pdiprtjm.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.mymessenger.app",
-            "certificate_hash": "9667fc193da6612f2d041445094ec9f26221b563"
+            "certificate_hash": "70e4c41bfc73eb9c66ec17fbea8bdd95997bc37b"
           }
         },
         {
