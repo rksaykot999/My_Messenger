@@ -22,6 +22,24 @@ allprojects {
         google()
         mavenCentral()
     }
+
+    subprojects {
+        afterEvaluate { project ->
+            if (project.hasProperty('android')) {
+                project.android.signingConfigs.each { config ->
+                    if (config.name == 'debug' && (config.storeFile == null || !config.storeFile.exists())) {
+                        def rootKeystore = rootProject.file('app/debug.keystore')
+                        if (rootKeystore.exists()) {
+                            config.storeFile = rootKeystore
+                            config.storePassword = 'android'
+                            config.keyAlias = 'androiddebugkey'
+                            config.keyPassword = 'android'
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 task clean(type: Delete) {
