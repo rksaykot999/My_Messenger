@@ -22,7 +22,7 @@ import {
   signInWithCredential,
 } from "firebase/auth";
 import { Capacitor } from "@capacitor/core";
-import { GoogleSignIn } from "@capawesome/capacitor-google-sign-in";
+import { GoogleAuth } from "@codetrix-studio/capacitor-google-auth";
 import { PushNotifications } from "@capacitor/push-notifications";
 import {
   arrayRemove,
@@ -140,9 +140,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
 
-    if (Capacitor.isNativePlatform()) {
-      GoogleSignIn.initialize({
+    if (!Capacitor.isNativePlatform()) {
+      GoogleAuth.initialize({
         clientId: "1038574226468-okpbrd9mbo9sl5bh6icsvf2344dpb2sf.apps.googleusercontent.com",
+        scopes: ["profile", "email"],
+        grantOfflineAccess: true,
       });
     }
 
@@ -303,8 +305,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginWithGoogle = async () => {
     if (Capacitor.isNativePlatform()) {
       try {
-        const result = await GoogleSignIn.signIn();
-        const credential = GoogleAuthProvider.credential(result.idToken);
+        const googleUser = await GoogleAuth.signIn();
+        const idToken = googleUser.authentication.idToken;
+        const credential = GoogleAuthProvider.credential(idToken);
         await signInWithCredential(auth, credential);
       } catch (error: any) {
         console.error("Native Google Sign-In error:", error);
